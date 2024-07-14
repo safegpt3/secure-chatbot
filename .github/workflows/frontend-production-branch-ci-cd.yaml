@@ -48,6 +48,8 @@ jobs:
 
       - name: Build frontend
         working-directory: ./frontend
+        env:
+          WS_URL: ${{ secrets.WS_URL }}
         run: npm run build
 
       - name: Configure AWS credentials

@@ -1,5 +1,3 @@
-//Comment - testing feature branch CI
-
 const {
   DynamoDBClient,
   UpdateItemCommand,
