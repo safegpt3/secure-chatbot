@@ -1,0 +1,457 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Description: Secure Chatbot Backend.
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - staging
+      - production
+    Description: "The environment where the stack will be deployed"
+  OpenaiApiKey:
+    Type: String
+    Description: "OpenaiApiKey environment variable"
+  BotpressToken:
+    Type: String
+    Description: "BotpressToken environment variable"
+  BotpressEndpoint:
+    Type: String
+    Description: "BotpressEndpoint environment variable"
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: nodejs20.x
+
+Resources:
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: SecureChatbotWebSocketApi
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      StageName: !Ref Environment
+      AutoDeploy: true
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: "$connect"
+      Target: !Join ["", ["integrations/", !Ref ConnectIntegration]]
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: "$disconnect"
+      Target: !Join ["", ["integrations/", !Ref DisconnectIntegration]]
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: "$default"
+      Target: !Join ["", ["integrations/", !Ref DefaultIntegration]]
+
+  SendRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: "send"
+      Target: !Join ["", ["integrations/", !Ref SendIntegration]]
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
+      PayloadFormatVersion: "1.0"
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
+      PayloadFormatVersion: "1.0"
+
+  DefaultIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDefaultFunction.Arn}/invocations
+      PayloadFormatVersion: "1.0"
+
+  SendIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+      PayloadFormatVersion: "1.0"
+
+  OnConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "OnConnectFunction-${Environment}"
+      CodeUri: chatbot/onConnect/
+      Handler: index.handler
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
+      Events:
+        WebSocket:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketApi
+            Path: /$connect
+            Method: post
+
+  OnDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "OnDisconnectFunction-${Environment}"
+      CodeUri: chatbot/onDisconnect/
+      Handler: index.handler
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
+      Events:
+        WebSocket:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketApi
+            Path: /$disconnect
+            Method: post
+
+  OnDefaultFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "OnDefaultFunction-${Environment}"
+      CodeUri: chatbot/onDefault/
+      Handler: index.handler
+      Events:
+        WebSocket:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketApi
+            Path: /$default
+            Method: post
+
+  SendMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "SendMessageFunction-${Environment}"
+      CodeUri: chatbot/sendMessage/
+      Handler: index.handler
+      Environment:
+        Variables:
+          ANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/anonymize"
+      Events:
+        WebSocket:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketApi
+            Path: /send
+            Method: post
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: AnonymizationServiceHttpApi
+      ProtocolType: HTTP
+
+  HttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: !Ref Environment
+      AutoDeploy: true
+
+  AnonymizeMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "AnonymizeMessageFunction-${Environment}"
+      CodeUri: anonymization-service/anonymizeMessage/
+      Handler: index.handler
+      Environment:
+        Variables:
+          LLM_LAMBDA_ENDPOINT: !GetAtt LlmStubFunctionUrl.FunctionUrl
+          VAULT_TABLE_NAME: !Ref SecureChatbotVault
+      Events:
+        HttpApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref HttpApi
+            Path: /anonymize
+            Method: post
+
+  DeanonymizeMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "DeanonymizeMessageFunction-${Environment}"
+      CodeUri: anonymization-service/deanonymizeMessage/
+      Handler: index.handler
+      Environment:
+        Variables:
+          VAULT_TABLE_NAME: !Ref SecureChatbotVault
+      Events:
+        HttpApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref HttpApi
+            Path: /deanonymize
+            Method: post
+
+  ForwardMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "ForwardMessageFunction-${Environment}"
+      CodeUri: chatbot/forwardMessage/
+      Handler: index.handler
+      Environment:
+        Variables:
+          DEANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/deanonymize"
+          CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
+          CALLBACK_URL: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+      AutoPublishAlias: live
+
+  ForwardMessageFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt ForwardMessageFunction.Arn
+
+  LlmStubFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "LlmStubFunction-${Environment}"
+      CodeUri: anonymization-service/llm-stub/
+      Handler: index.handler
+      AutoPublishAlias: live
+
+  LlmStubFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt LlmStubFunction.Arn
+
+  OnDeleteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "OnDeleteFunction-${Environment}"
+      CodeUri: chatbot/onDelete/
+      Handler: index.handler
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
+          VAULT_TABLE_NAME: !Ref SecureChatbotVault
+
+  DeleteScheduler:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "DeleteScheduler-${Environment}"
+      Description: "Trigger onDelete every 5 minutes"
+      ScheduleExpression: "rate(5 minutes)"
+      State: "ENABLED"
+      Targets:
+        - Id: "TargetFunction"
+          Arn: !GetAtt OnDeleteFunction.Arn
+          Input: '{"source": "EventBridgeScheduler"}'
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt OnDeleteFunction.Arn
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt DeleteScheduler.Arn
+
+  SecureChatbotVault:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "secure-chatbot-vault-${Environment}"
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: "conversationId"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "conversationId"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  VaultReadScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      ResourceId: !Sub "table/secure-chatbot-vault-${Environment}"
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: "dynamodb"
+      RoleARN: !GetAtt AutoscalingRole.Arn
+
+  VaultWriteScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      ResourceId: !Sub "table/secure-chatbot-vault-${Environment}"
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: "dynamodb"
+      RoleARN: !GetAtt AutoscalingRole.Arn
+
+  VaultReadScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: "VaultReadCapacityUtilization"
+      PolicyType: "TargetTrackingScaling"
+      ScalingTargetId: !Ref VaultReadScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        PredefinedMetricSpecification:
+          PredefinedMetricType: "DynamoDBReadCapacityUtilization"
+
+  VaultWriteScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: "VaultWriteCapacityUtilization"
+      PolicyType: "TargetTrackingScaling"
+      ScalingTargetId: !Ref VaultWriteScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        PredefinedMetricSpecification:
+          PredefinedMetricType: "DynamoDBWriteCapacityUtilization"
+
+  SecureChatbotConnections:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "secure-chatbot-connections-${Environment}"
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: "conversationId"
+          AttributeType: "S"
+        - AttributeName: "connectionId"
+          AttributeType: "S"
+        - AttributeName: "active"
+          AttributeType: "S"
+        - AttributeName: "disconnectedAt"
+          AttributeType: "N"
+      KeySchema:
+        - AttributeName: "conversationId"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      GlobalSecondaryIndexes:
+        - IndexName: "active-disconnectedAt-index"
+          KeySchema:
+            - AttributeName: "active"
+              KeyType: "HASH"
+            - AttributeName: "disconnectedAt"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: "connectionId-index"
+          KeySchema:
+            - AttributeName: "connectionId"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+
+  ConnectionsReadScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      ResourceId: !Sub "table/secure-chatbot-connections-${Environment}"
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: "dynamodb"
+      RoleARN: !GetAtt AutoscalingRole.Arn
+
+  ConnectionsWriteScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      ResourceId: !Sub "table/secure-chatbot-connections-${Environment}"
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: "dynamodb"
+      RoleARN: !GetAtt AutoscalingRole.Arn
+
+  ConnectionsReadScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: "ConnectionsReadCapacityUtilization"
+      PolicyType: "TargetTrackingScaling"
+      ScalingTargetId: !Ref ConnectionsReadScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        PredefinedMetricSpecification:
+          PredefinedMetricType: "DynamoDBReadCapacityUtilization"
+
+  ConnectionsWriteScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: "ConnectionsWriteCapacityUtilization"
+      PolicyType: "TargetTrackingScaling"
+      ScalingTargetId: !Ref ConnectionsWriteScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        PredefinedMetricSpecification:
+          PredefinedMetricType: "DynamoDBWriteCapacityUtilization"
+
+  AutoscalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "AutoscalingRole-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "application-autoscaling.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "DynamoDBAutoscalingPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "dynamodb:UpdateTable"
+                  - "dynamodb:DescribeTable"
+                Resource: "*"
+
+Outputs:
+  WebSocketApiEndpoint:
+    Description: "Websocket API endpoint URL for real-time interactions"
+    Value: !Sub "wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+
+  HttpApiEndpoint:
+    Description: "HTTP API endpoint URL for anonymization services"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+
+  ForwardMessageUrl:
+    Description: "Direct URL for ForwardMessage function"
+    Value: !GetAtt ForwardMessageFunctionUrl.FunctionUrl
+
+  LlmStubUrl:
+    Description: "Direct URL for LLM-Stub function"
+    Value: !GetAtt LlmStubFunctionUrl.FunctionUrl
