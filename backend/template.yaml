@@ -180,6 +180,8 @@ Resources:
       Environment:
         Variables:
           ANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/anonymize"
+          BOTPRESS_TOKEN: !Ref BotpressToken
+          BOTPRESS_ENDPOINT: !Ref BotpressEndpoint
       Events:
         WebSocket:
           Type: Api
@@ -217,7 +219,7 @@ Resources:
       Handler: index.handler
       Environment:
         Variables:
-          LLM_LAMBDA_ENDPOINT: !GetAtt LlmStubFunctionUrl.FunctionUrl
+          LLM_LAMBDA_ENDPOINT: !Sub "https://${LlmStubFunction}.lambda-url.${AWS::Region}.on.aws"
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
       Events:
         AnonymizeApi:
@@ -247,35 +249,101 @@ Resources:
   ForwardMessageFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub "ForwardMessageFunction-${Environment}"
-      CodeUri: chatbot/forwardMessage/
+      CodeUri: .
+      MemorySize: 128
+      Timeout: 3
       Handler: index.handler
       Environment:
         Variables:
           DEANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/deanonymize"
           CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
           CALLBACK_URL: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
-      AutoPublishAlias: live
-
-  ForwardMessageFunctionUrl:
-    Type: AWS::Lambda::Url
-    Properties:
-      AuthType: NONE
-      TargetFunctionArn: !GetAtt ForwardMessageFunction.Arn
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - execute-api:Invoke
+                - execute-api:ManageConnections
+              Resource: arn:aws:execute-api:*:*:*
+            - Effect: Allow
+              Action:
+                - dynamodb:*
+                - dax:*
+                - cloudwatch:*
+                - datapipeline:*
+                - ec2:DescribeVpcs
+                - ec2:DescribeSubnets
+                - ec2:DescribeSecurityGroups
+                - iam:GetRole
+                - iam:ListRoles
+                - kms:DescribeKey
+                - kms:ListAliases
+                - sns:*
+                - lambda:*
+                - resource-groups:*
+                - tag:GetResources
+                - kinesis:*
+              Resource: "*"
+            - Effect: Allow
+              Action: cloudwatch:GetInsightRuleReport
+              Resource: arn:aws:cloudwatch:*:*:insight-rule/DynamoDBContributorInsights*
+            - Effect: Allow
+              Action: iam:PassRole
+              Resource: "*"
+              Condition:
+                StringLike:
+                  iam:PassedToService:
+                    - application-autoscaling.amazonaws.com
+                    - application-autoscaling.amazonaws.com.cn
+                    - dax.amazonaws.com
+            - Effect: Allow
+              Action: iam:CreateServiceLinkedRole
+              Resource: "*"
+              Condition:
+                StringEquals:
+                  iam:AWSServiceName:
+                    - replication.dynamodb.amazonaws.com
+                    - dax.amazonaws.com
+                    - dynamodb.application-autoscaling.amazonaws.com
+                    - contributorinsights.dynamodb.amazonaws.com
+                    - kinesisreplication.dynamodb.amazonaws.com
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
 
   LlmStubFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub "LlmStubFunction-${Environment}"
-      CodeUri: anonymization-service/llm-stub/
+      CodeUri: .
+      Description: ""
+      MemorySize: 128
+      Timeout: 10
       Handler: index.handler
-      AutoPublishAlias: live
-
-  LlmStubFunctionUrl:
-    Type: AWS::Lambda::Url
-    Properties:
-      AuthType: NONE
-      TargetFunctionArn: !GetAtt LlmStubFunction.Arn
+      Environment:
+        Variables:
+          OPENAI_API_KEY: !Ref OpenaiApiKey
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 21600
+        MaximumRetryAttempts: 2
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+      PackageType: Zip
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: "*"
+      SnapStart:
+        ApplyOn: None
+      RuntimeManagementConfig:
+        UpdateRuntimeOn: Auto
 
   OnDeleteFunction:
     Type: AWS::Serverless::Function
@@ -482,8 +550,8 @@ Outputs:
 
   ForwardMessageUrl:
     Description: "Direct URL for ForwardMessage function"
-    Value: !GetAtt ForwardMessageFunctionUrl.FunctionUrl
+    Value: !Sub "https://${ForwardMessageFunction}.lambda-url.${AWS::Region}.on.aws"
 
   LlmStubUrl:
     Description: "Direct URL for LLM-Stub function"
-    Value: !GetAtt LlmStubFunctionUrl.FunctionUrl
+    Value: !Sub "https://${LlmStubFunction}.lambda-url.${AWS::Region}.on.aws"
