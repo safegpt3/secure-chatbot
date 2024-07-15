@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Deploy-backend
+
 set -e
 
 # Check if the required environment variables are set
@@ -30,41 +32,16 @@ ENVIRONMENT=$1
 # Define the stack name
 STACK_NAME="secure-chatbot-backend-$ENVIRONMENT"
 
-# Define the S3 bucket
-S3_BUCKET="secure-chatbot-backend-artifacts-bucket"
-
-# Check the S3 bucket status
-bucketstatus=$(aws s3api head-bucket --bucket "${S3_BUCKET}" 2>&1)
-if echo "${bucketstatus}" | grep 'Not Found'; then
-  echo "Bucket doesn't exist, creating bucket: $S3_BUCKET"
-  aws s3 mb s3://$S3_BUCKET --region $AWS_REGION
-  if [[ $? -ne 0 ]]; then
-    echo "Failed to create bucket. Exiting."
-    exit 1
-  fi
-elif echo "${bucketstatus}" | grep 'Forbidden'; then
-  echo "Bucket exists but not owned by you. Exiting."
-  exit 1
-elif echo "${bucketstatus}" | grep 'Bad Request'; then
-  echo "Bucket name specified is less than 3 or greater than 63 characters. Exiting."
-  exit 1
-else
-  echo "S3 bucket $S3_BUCKET already exists"
-fi
-
 # Build the SAM application
-echo "Building the SAM application..."
 sam build --template-file backend/template.yaml
 
 # Package the SAM application
-echo "Packaging the SAM application..."
 sam package \
   --output-template-file packaged.yaml \
-  --s3-bucket $S3_BUCKET \
+  --s3-bucket secure-chatbot-backend-artifacts-bucket \
   --region $AWS_REGION
 
 # Deploy the SAM application
-echo "Deploying the SAM application..."
 sam deploy \
   --template-file packaged.yaml \
   --stack-name $STACK_NAME \
@@ -77,7 +54,6 @@ sam deploy \
     ParameterKey=BotpressEndpoint,ParameterValue=$BOTPRESS_ENDPOINT
 
 # Output the stack outputs
-echo "Fetching stack outputs..."
 aws cloudformation describe-stacks \
   --stack-name $STACK_NAME \
   --query "Stacks[0].Outputs" \
