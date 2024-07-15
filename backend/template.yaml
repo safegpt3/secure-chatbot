@@ -198,10 +198,9 @@ Resources:
       Principal: apigateway.amazonaws.com
 
   HttpApi:
-    Type: AWS::ApiGatewayV2::Api
+    Type: AWS::Serverless::HttpApi
     Properties:
       Name: AnonymizationServiceHttpApi
-      ProtocolType: HTTP
 
   HttpApiStage:
     Type: AWS::ApiGatewayV2::Stage
@@ -221,10 +220,10 @@ Resources:
           LLM_LAMBDA_ENDPOINT: !GetAtt LlmStubFunctionUrl.FunctionUrl
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
       Events:
-        HttpApi:
-          Type: Api
+        AnonymizeApi:
+          Type: HttpApi
           Properties:
-            RestApiId: !Ref HttpApi
+            ApiId: !Ref HttpApi
             Path: /anonymize
             Method: post
 
@@ -238,10 +237,10 @@ Resources:
         Variables:
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
       Events:
-        HttpApi:
-          Type: Api
+        DeanonymizeApi:
+          Type: HttpApi
           Properties:
-            RestApiId: !Ref HttpApi
+            ApiId: !Ref HttpApi
             Path: /deanonymize
             Method: post
 
