@@ -10,8 +10,6 @@ const useWebSocket = (
   handleNewMessage
 ) => {
   const wsURL = import.meta.env.VITE_WS_URL;
-  console.log("ws URL:", wsURL);
-  console.log("conversationId:", conversationId);
 
   const firstRenderRef = useRef(true);
 
