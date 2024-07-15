@@ -54,20 +54,40 @@ else
   echo "S3 bucket $S3_BUCKET already exists"
 fi
 
+# Verify S3 bucket existence
+echo "Verifying S3 bucket status..."
+for i in {1..5}; do
+  bucketstatus=$(aws s3api head-bucket --bucket "${S3_BUCKET}" 2>&1)
+  if echo "${bucketstatus}" | grep 'Not Found\|Forbidden\|Bad Request'; then
+    echo "Bucket status check failed, attempt $i. Retrying in 5 seconds..."
+    sleep 5
+  else
+    echo "Bucket status check succeeded."
+    break
+  fi
+  if [ $i -eq 5 ]; then
+    echo "Bucket status check failed after 5 attempts. Exiting."
+    exit 1
+  fi
+done
+
 # Clear SAM build cache
 echo "Clearing SAM build cache..."
 rm -rf .aws-sam/build
 
 # Build the SAM application
-sam build --template-file backend/template.yaml --cached
+echo "Building the SAM application..."
+sam build --template-file backend/template.yaml
 
 # Package the SAM application
+echo "Packaging the SAM application..."
 sam package \
   --output-template-file packaged.yaml \
   --s3-bucket $S3_BUCKET \
   --region $AWS_REGION
 
 # Deploy the SAM application
+echo "Deploying the SAM application..."
 sam deploy \
   --template-file packaged.yaml \
   --stack-name $STACK_NAME \
@@ -80,6 +100,7 @@ sam deploy \
     ParameterKey=BotpressEndpoint,ParameterValue=$BOTPRESS_ENDPOINT
 
 # Output the stack outputs
+echo "Fetching stack outputs..."
 aws cloudformation describe-stacks \
   --stack-name $STACK_NAME \
   --query "Stacks[0].Outputs" \
