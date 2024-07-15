@@ -1,10 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 
 const useWebSocket = (
   wsRef,
-  isConnected,
   setIsConnected,
-  isSending,
   setIsSending,
   conversationId,
   handleNewMessage
