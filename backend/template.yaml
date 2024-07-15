@@ -115,6 +115,18 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /$connect
             Method: post
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SecureChatbotConnections
+
+  OnConnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebSocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnConnectFunction
+      Principal: apigateway.amazonaws.com
 
   OnDisconnectFunction:
     Type: AWS::Serverless::Function
@@ -132,6 +144,18 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /$disconnect
             Method: post
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SecureChatbotConnections
+
+  OnDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebSocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnDisconnectFunction
+      Principal: apigateway.amazonaws.com
 
   OnDefaultFunction:
     Type: AWS::Serverless::Function
@@ -163,6 +187,15 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /send
             Method: post
+
+  SendMessagePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebSocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SendMessageFunction
+      Principal: apigateway.amazonaws.com
 
   HttpApi:
     Type: AWS::ApiGatewayV2::Api
