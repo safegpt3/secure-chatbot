@@ -198,10 +198,9 @@ Resources:
       Principal: apigateway.amazonaws.com
 
   HttpApi:
-    Type: AWS::ApiGatewayV2::Api
+    Type: AWS::Serverless::HttpApi
     Properties:
       Name: AnonymizationServiceHttpApi
-      ProtocolType: HTTP
 
   HttpApiStage:
     Type: AWS::ApiGatewayV2::Stage
@@ -216,15 +215,16 @@ Resources:
       FunctionName: !Sub "AnonymizeMessageFunction-${Environment}"
       CodeUri: anonymization-service/anonymizeMessage/
       Handler: index.handler
+      Runtime: python3.8
       Environment:
         Variables:
           LLM_LAMBDA_ENDPOINT: !GetAtt LlmStubFunctionUrl.FunctionUrl
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
       Events:
-        HttpApi:
-          Type: Api
+        AnonymizeApi:
+          Type: HttpApi
           Properties:
-            RestApiId: !Ref HttpApi
+            ApiId: !Ref HttpApi
             Path: /anonymize
             Method: post
 
@@ -234,14 +234,15 @@ Resources:
       FunctionName: !Sub "DeanonymizeMessageFunction-${Environment}"
       CodeUri: anonymization-service/deanonymizeMessage/
       Handler: index.handler
+      Runtime: python3.8
       Environment:
         Variables:
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
       Events:
-        HttpApi:
-          Type: Api
+        DeanonymizeApi:
+          Type: HttpApi
           Properties:
-            RestApiId: !Ref HttpApi
+            ApiId: !Ref HttpApi
             Path: /deanonymize
             Method: post
 
