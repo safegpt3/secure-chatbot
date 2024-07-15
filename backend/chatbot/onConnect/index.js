@@ -1,4 +1,4 @@
-//onConnect Lambda
+//onConnect
 
 const {
   DynamoDBClient,

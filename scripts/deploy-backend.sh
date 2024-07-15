@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Deploy-backend
-
 set -e
 
 # Check if the required environment variables are set
