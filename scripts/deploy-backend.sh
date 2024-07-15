@@ -54,27 +54,6 @@ else
   echo "S3 bucket $S3_BUCKET already exists"
 fi
 
-# Verify S3 bucket existence
-echo "Verifying S3 bucket status..."
-for i in {1..5}; do
-  bucketstatus=$(aws s3api head-bucket --bucket "${S3_BUCKET}" 2>&1)
-  if echo "${bucketstatus}" | grep 'Not Found\|Forbidden\|Bad Request'; then
-    echo "Bucket status check failed, attempt $i. Retrying in 5 seconds..."
-    sleep 5
-  else
-    echo "Bucket status check succeeded."
-    break
-  fi
-  if [ $i -eq 5 ]; then
-    echo "Bucket status check failed after 5 attempts. Exiting."
-    exit 1
-  fi
-done
-
-# Clear SAM build cache
-echo "Clearing SAM build cache..."
-rm -rf .aws-sam/build
-
 # Build the SAM application
 echo "Building the SAM application..."
 sam build --template-file backend/template.yaml
