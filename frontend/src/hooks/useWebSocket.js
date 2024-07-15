@@ -1,13 +1,17 @@
-import { useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const useWebSocket = (
   wsRef,
+  isConnected,
   setIsConnected,
+  isSending,
   setIsSending,
   conversationId,
   handleNewMessage
 ) => {
-  const wsURL = process.env.WS_URL;
+  const wsURL = import.meta.env.VITE_WS_URL;
+  console.log("ws URL:", wsURL);
+  console.log("conversationId:", conversationId);
 
   const firstRenderRef = useRef(true);
 
