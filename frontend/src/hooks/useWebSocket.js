@@ -9,7 +9,7 @@ const useWebSocket = (
   conversationId,
   handleNewMessage
 ) => {
-  const wsURL = process.env.REACT_APP_WS_URL;
+  const wsURL = process.env.WS_URL;
 
   const firstRenderRef = useRef(true);
 

@@ -1,4 +1,4 @@
-//Comment - testing feature branch CI
+//onConnect
 
 const {
   DynamoDBClient,
