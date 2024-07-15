@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import FloatingActionButton from "@/components/chatbot/FloatingActionButton";
 import Chatbot from "@/components/chatbot/Chatbot";
 import useAuth from "@/hooks/useAuth";
