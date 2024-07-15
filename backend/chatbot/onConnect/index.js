@@ -1,3 +1,5 @@
+//onConnect Lambda
+
 const {
   DynamoDBClient,
   UpdateItemCommand,
