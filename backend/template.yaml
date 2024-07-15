@@ -215,7 +215,6 @@ Resources:
       FunctionName: !Sub "AnonymizeMessageFunction-${Environment}"
       CodeUri: anonymization-service/anonymizeMessage/
       Handler: index.handler
-      Runtime: python3.8
       Environment:
         Variables:
           LLM_LAMBDA_ENDPOINT: !GetAtt LlmStubFunctionUrl.FunctionUrl
@@ -234,7 +233,6 @@ Resources:
       FunctionName: !Sub "DeanonymizeMessageFunction-${Environment}"
       CodeUri: anonymization-service/deanonymizeMessage/
       Handler: index.handler
-      Runtime: python3.8
       Environment:
         Variables:
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
