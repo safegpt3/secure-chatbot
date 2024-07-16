@@ -319,6 +319,18 @@ Resources:
       TargetFunctionArn: !GetAtt ForwardMessageFunction.Arn
       AuthType: NONE
       InvokeMode: BUFFERED
+      Cors:
+        AllowOrigins: "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+    ResourcePolicy:
+      Statement:
+        - Effect: Allow
+          Principal: "*"
+          Action: lambda:InvokeFunctionUrl
+          Resource: !GetAtt ForwardMessageFunction.Arn
 
   LlmStubFunction:
     Type: AWS::Serverless::Function
@@ -352,6 +364,18 @@ Resources:
       TargetFunctionArn: !GetAtt LlmStubFunction.Arn
       AuthType: NONE
       InvokeMode: BUFFERED
+      Cors:
+        AllowOrigins: "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+    ResourcePolicy:
+      Statement:
+        - Effect: Allow
+          Principal: "*"
+          Action: lambda:InvokeFunctionUrl
+          Resource: !GetAtt LlmStubFunction.Arn
 
   OnDeleteFunction:
     Type: AWS::Serverless::Function
