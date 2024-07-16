@@ -320,11 +320,11 @@ Resources:
       AuthType: NONE
       InvokeMode: BUFFERED
       Cors:
-        AllowOrigins: "*"
+        AllowOrigins:
+          - "*"
         AllowMethods:
           - GET
           - POST
-          - OPTIONS
 
   ForwardMessageFunctionUrlPermission:
     Type: AWS::Lambda::Permission
@@ -366,11 +366,11 @@ Resources:
       AuthType: NONE
       InvokeMode: BUFFERED
       Cors:
-        AllowOrigins: "*"
+        AllowOrigins:
+          - "*"
         AllowMethods:
           - GET
           - POST
-          - OPTIONS
 
   LlmStubFunctionUrlPermission:
     Type: AWS::Lambda::Permission
