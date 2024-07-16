@@ -408,10 +408,16 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:Query
-                - dynamodb:BatchWriteItem
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotConnections}"
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotConnections}/index/active-disconnectedAt-index"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:BatchWriteItem
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotConnections}"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotVault}"
 
   DeleteScheduler:
     Type: AWS::Events::Rule
