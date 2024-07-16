@@ -245,6 +245,12 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /deanonymize
             Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotVault}"
 
   ForwardMessageFunction:
     Type: AWS::Serverless::Function
