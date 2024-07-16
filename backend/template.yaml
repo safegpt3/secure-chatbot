@@ -250,7 +250,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "ForwardMessageFunction-${Environment}"
-      CodeUri: forward_message/
+      CodeUri: chatbot/forwardMessage/
       Handler: index.handler
       Environment:
         Variables:
@@ -324,7 +324,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "LlmStubFunction-${Environment}"
-      CodeUri: llm_stub/
+      CodeUri: anonymization-service/llm-stub/
       Handler: index.handler
       Environment:
         Variables:
