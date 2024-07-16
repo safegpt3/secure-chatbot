@@ -332,6 +332,7 @@ Resources:
       FunctionName: !GetAtt ForwardMessageFunction.Arn
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
+      FunctionUrlAuthType: NONE
 
   LlmStubFunction:
     Type: AWS::Serverless::Function
@@ -378,6 +379,7 @@ Resources:
       FunctionName: !GetAtt LlmStubFunction.Arn
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
+      FunctionUrlAuthType: NONE
 
   OnDeleteFunction:
     Type: AWS::Serverless::Function
