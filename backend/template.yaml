@@ -325,12 +325,13 @@ Resources:
           - GET
           - POST
           - OPTIONS
-    ResourcePolicy:
-      Statement:
-        - Effect: Allow
-          Principal: "*"
-          Action: lambda:InvokeFunctionUrl
-          Resource: !GetAtt ForwardMessageFunction.Arn
+
+  ForwardMessageFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ForwardMessageFunction.Arn
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
 
   LlmStubFunction:
     Type: AWS::Serverless::Function
@@ -370,12 +371,13 @@ Resources:
           - GET
           - POST
           - OPTIONS
-    ResourcePolicy:
-      Statement:
-        - Effect: Allow
-          Principal: "*"
-          Action: lambda:InvokeFunctionUrl
-          Resource: !GetAtt LlmStubFunction.Arn
+
+  LlmStubFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt LlmStubFunction.Arn
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
 
   OnDeleteFunction:
     Type: AWS::Serverless::Function
