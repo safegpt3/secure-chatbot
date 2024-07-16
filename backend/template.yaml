@@ -250,6 +250,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "ForwardMessageFunction-${Environment}"
+      CodeUri: forward_message/
       Handler: index.handler
       Environment:
         Variables:
@@ -312,10 +313,18 @@ Resources:
                 - logs:PutLogEvents
               Resource: "*"
 
+  ForwardMessageFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt ForwardMessageFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
+
   LlmStubFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "LlmStubFunction-${Environment}"
+      CodeUri: llm_stub/
       Handler: index.handler
       Environment:
         Variables:
@@ -323,9 +332,6 @@ Resources:
       EventInvokeConfig:
         MaximumEventAgeInSeconds: 21600
         MaximumRetryAttempts: 2
-      FunctionUrlConfig:
-        AuthType: NONE
-        InvokeMode: BUFFERED
       PackageType: Zip
       Policies:
         - Statement:
@@ -339,6 +345,13 @@ Resources:
         ApplyOn: None
       RuntimeManagementConfig:
         UpdateRuntimeOn: Auto
+
+  LlmStubFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt LlmStubFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
 
   OnDeleteFunction:
     Type: AWS::Serverless::Function
