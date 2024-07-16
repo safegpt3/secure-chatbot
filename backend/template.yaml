@@ -219,7 +219,7 @@ Resources:
       Handler: index.handler
       Environment:
         Variables:
-          LLM_LAMBDA_ENDPOINT: !Sub "https://${LlmStubFunction}.lambda-url.${AWS::Region}.on.aws"
+          LLM_LAMBDA_ENDPOINT: !GetAtt LlmStubFunctionUrl.FunctionUrl
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
       Events:
         AnonymizeApi:
@@ -249,9 +249,8 @@ Resources:
   ForwardMessageFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
-      MemorySize: 128
-      Timeout: 3
+      FunctionName: !Sub "ForwardMessageFunction-${Environment}"
+      CodeUri: chatbot/forwardMessage/
       Handler: index.handler
       Environment:
         Variables:
@@ -314,13 +313,18 @@ Resources:
                 - logs:PutLogEvents
               Resource: "*"
 
+  ForwardMessageFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt ForwardMessageFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
+
   LlmStubFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
-      Description: ""
-      MemorySize: 128
-      Timeout: 10
+      FunctionName: !Sub "LlmStubFunction-${Environment}"
+      CodeUri: anonymization-service/llm-stub/
       Handler: index.handler
       Environment:
         Variables:
@@ -328,9 +332,6 @@ Resources:
       EventInvokeConfig:
         MaximumEventAgeInSeconds: 21600
         MaximumRetryAttempts: 2
-      FunctionUrlConfig:
-        AuthType: NONE
-        InvokeMode: BUFFERED
       PackageType: Zip
       Policies:
         - Statement:
@@ -344,6 +345,13 @@ Resources:
         ApplyOn: None
       RuntimeManagementConfig:
         UpdateRuntimeOn: Auto
+
+  LlmStubFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt LlmStubFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
 
   OnDeleteFunction:
     Type: AWS::Serverless::Function
@@ -550,8 +558,8 @@ Outputs:
 
   ForwardMessageUrl:
     Description: "Direct URL for ForwardMessage function"
-    Value: !Sub "https://${ForwardMessageFunction}.lambda-url.${AWS::Region}.on.aws"
+    Value: !GetAtt ForwardMessageFunctionUrl.FunctionUrl
 
   LlmStubUrl:
     Description: "Direct URL for LLM-Stub function"
-    Value: !Sub "https://${LlmStubFunction}.lambda-url.${AWS::Region}.on.aws"
+    Value: !GetAtt LlmStubFunctionUrl.FunctionUrl
