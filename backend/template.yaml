@@ -228,6 +228,12 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /anonymize
             Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotVault}"
 
   DeanonymizeMessageFunction:
     Type: AWS::Serverless::Function
@@ -397,6 +403,12 @@ Resources:
         Variables:
           CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotConnections}/index/active-disconnectedAt-index"
 
   DeleteScheduler:
     Type: AWS::Events::Rule
