@@ -219,7 +219,7 @@ Resources:
       Handler: index.handler
       Environment:
         Variables:
-          LLM_LAMBDA_ENDPOINT: !Sub "https://${LlmStubFunction}.lambda-url.${AWS::Region}.on.aws"
+          LLM_LAMBDA_ENDPOINT: !GetAtt LlmStubFunctionUrl.FunctionUrl
           VAULT_TABLE_NAME: !Ref SecureChatbotVault
       Events:
         AnonymizeApi:
@@ -249,9 +249,7 @@ Resources:
   ForwardMessageFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
-      MemorySize: 128
-      Timeout: 3
+      FunctionName: !Sub "ForwardMessageFunction-${Environment}"
       Handler: index.handler
       Environment:
         Variables:
@@ -317,10 +315,7 @@ Resources:
   LlmStubFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
-      Description: ""
-      MemorySize: 128
-      Timeout: 10
+      FunctionName: !Sub "LlmStubFunction-${Environment}"
       Handler: index.handler
       Environment:
         Variables:
@@ -550,8 +545,8 @@ Outputs:
 
   ForwardMessageUrl:
     Description: "Direct URL for ForwardMessage function"
-    Value: !Sub "https://${ForwardMessageFunction}.lambda-url.${AWS::Region}.on.aws"
+    Value: !GetAtt ForwardMessageFunctionUrl.FunctionUrl
 
   LlmStubUrl:
     Description: "Direct URL for LLM-Stub function"
-    Value: !Sub "https://${LlmStubFunction}.lambda-url.${AWS::Region}.on.aws"
+    Value: !GetAtt LlmStubFunctionUrl.FunctionUrl
