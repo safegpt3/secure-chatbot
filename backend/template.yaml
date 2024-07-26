@@ -37,6 +37,8 @@ Resources:
           AttributeType: "S"
         - AttributeName: "connectionId"
           AttributeType: "S"
+        - AttributeName: "conversationId"
+          AttributeType: "S"
       KeySchema:
         - AttributeName: "PK"
           KeyType: "HASH"
@@ -49,6 +51,15 @@ Resources:
         - IndexName: "connectionId-index"
           KeySchema:
             - AttributeName: "connectionId"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: "conversationId-index"
+          KeySchema:
+            - AttributeName: "conversationId"
               KeyType: "HASH"
           Projection:
             ProjectionType: "ALL"

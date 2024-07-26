@@ -2,6 +2,7 @@ const {
   DynamoDBClient,
   PutItemCommand,
   GetItemCommand,
+  QueryCommand,
   UpdateItemCommand,
 } = require("@aws-sdk/client-dynamodb");
 
@@ -24,27 +25,53 @@ const apiGatewayClient = new ApiGatewayManagementApiClient({
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
-  let userId, conversationId, message;
+  let conversationId, message, userId;
   try {
     const requestBody = JSON.parse(event.body);
-    ({ userId, conversationId, message } = requestBody);
+    ({ conversationId, message } = requestBody);
     console.log("Parsed request body:", requestBody);
-  } catch (parseError) {
-    console.error("Error parsing request body:", parseError);
-    return {
-      statusCode: 400,
-      body: JSON.stringify({
-        error: "Invalid request body",
-      }),
-    };
-  }
 
-  if (!userId || !conversationId || !message) {
-    console.error("Missing userId, conversationId, or message");
+    if (!conversationId || !message) {
+      console.error("Missing conversationId or message");
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          error: "conversationId and message are required",
+        }),
+      };
+    }
+
+    // Query to get the userId based on the conversationId
+    const queryParams = {
+      TableName,
+      IndexName: "conversationId-index", // Ensure you have this GSI created
+      KeyConditionExpression: "SK = :sk",
+      ExpressionAttributeValues: {
+        ":sk": { S: `conversationID#${conversationId}` },
+      },
+    };
+
+    const queryResult = await dynamoDbClient.send(
+      new QueryCommand(queryParams)
+    );
+    if (queryResult.Items.length === 0) {
+      console.error("User ID not found for conversationId:", conversationId);
+      return {
+        statusCode: 404,
+        body: JSON.stringify({
+          message: "User ID not found for conversation ID",
+        }),
+      };
+    }
+
+    userId = queryResult.Items[0].PK.S.split("#")[1];
+    console.log("User ID found:", userId);
+  } catch (error) {
+    console.error("Error processing request:", error);
     return {
       statusCode: 400,
       body: JSON.stringify({
-        error: "userId, conversationId, and message are required",
+        error: "Invalid request body or failed to fetch user ID",
       }),
     };
   }
