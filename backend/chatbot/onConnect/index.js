@@ -1,6 +1,5 @@
 const {
   DynamoDBClient,
-  UpdateItemCommand,
   PutItemCommand,
   GetItemCommand,
 } = require("@aws-sdk/client-dynamodb");
@@ -64,7 +63,7 @@ exports.handler = async (event) => {
       },
     };
 
-    await docClient.send(new UpdateItemCommand(updateConversationParams));
+    await docClient.send(new PutItemCommand(updateConversationParams));
 
     return { statusCode: 200, body: "Connected." };
   } catch (err) {

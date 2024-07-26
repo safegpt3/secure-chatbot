@@ -18,14 +18,14 @@ const useWebSocket = (
     return url.toString();
   };
 
-  const wsURL = constructWsUrl(
-    import.meta.env.VITE_WS_URL,
-    conversationId,
-    userId
-  );
-
   const openConnection = () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      const wsURL = constructWsUrl(
+        import.meta.env.VITE_WS_URL,
+        conversationId,
+        userId
+      );
+      console.log("wsURL: ", wsURL);
       wsRef.current = new WebSocket(wsURL);
 
       wsRef.current.onopen = () => {
@@ -79,9 +79,11 @@ const useWebSocket = (
   };
 
   useEffect(() => {
-    closeConnection();
-    openConnection();
-  }, [conversationId]);
+    if (userId && conversationId) {
+      closeConnection();
+      openConnection();
+    }
+  }, [conversationId, userId]);
 
   useEffect(() => {
     return () => {

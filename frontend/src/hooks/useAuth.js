@@ -11,7 +11,7 @@ const useAuth = (setUserId) => {
     }
   }, []);
 
-  const authenticateUser = (token) => {
+  const authenticateUser = async (token) => {
     try {
       const decodedToken = jwtDecode(token);
       const fetchedUserId = decodedToken.id;
