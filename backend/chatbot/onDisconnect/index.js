@@ -3,7 +3,7 @@ const {
   QueryCommand,
   UpdateItemCommand,
 } = require("@aws-sdk/client-dynamodb");
-const TableName = process.env.CONNECTIONS_TABLE_NAME;
+const TableName = process.env.TABLE_NAME;
 
 const docClient = new DynamoDBClient();
 
@@ -31,15 +31,19 @@ exports.handler = async (event) => {
       return { statusCode: 404, body: "No connection found." };
     }
 
-    const conversationId = queryResult.Items[0].conversationId.S;
-    const disconnectedAt = Math.floor(Date.now() / 1000);
+    const userId = queryResult.Items[0].PK.S.split("#")[1];
+    const conversationId = queryResult.Items[0].SK.S.split("#")[1];
+    const disconnectedAt = new Date().toISOString();
     const updateParams = {
       TableName,
-      Key: { conversationId: { S: conversationId } },
-      UpdateExpression: "set active = :a, disconnectedAt = :d",
+      Key: {
+        PK: { S: `userID#${userId}` },
+        SK: { S: `conversationID#${conversationId}` },
+      },
+      UpdateExpression: "set status = :a, disconnectedAt = :d",
       ExpressionAttributeValues: {
-        ":a": { S: "false" },
-        ":d": { N: disconnectedAt.toString() },
+        ":a": { S: "inactive" },
+        ":d": { S: disconnectedAt },
       },
     };
 

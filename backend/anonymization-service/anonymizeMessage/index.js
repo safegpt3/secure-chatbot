@@ -1,21 +1,32 @@
 const {
   DynamoDBClient,
   UpdateItemCommand,
+  GetItemCommand,
 } = require("@aws-sdk/client-dynamodb");
+
+const {
+  ApiGatewayManagementApiClient,
+  PostToConnectionCommand,
+} = require("@aws-sdk/client-apigatewaymanagementapi");
+
 const axios = require("axios");
 
 const LLM_LAMBDA_ENDPOINT = process.env.LLM_LAMBDA_ENDPOINT;
-const TableName = process.env.VAULT_TABLE_NAME;
+const TableName = process.env.TABLE_NAME;
+const callbackUrl = process.env.CALLBACK_URL;
 
 const dynamoDbClient = new DynamoDBClient();
+const apiGatewayClient = new ApiGatewayManagementApiClient({
+  endpoint: callbackUrl,
+});
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
-  let message, conversationId;
+  let userId, conversationId, message;
   try {
     const requestBody = JSON.parse(event.body);
-    ({ message, conversationId } = requestBody);
+    ({ userId, conversationId, message } = requestBody);
     console.log("Parsed request body:", requestBody);
   } catch (parseError) {
     console.error("Error parsing request body:", parseError);
@@ -27,17 +38,43 @@ exports.handler = async (event) => {
     };
   }
 
-  if (!message || !conversationId) {
-    console.error("Missing message or conversationId");
+  if (!userId || !conversationId || !message) {
+    console.error("Missing userId, or conversationId or message");
     return {
       statusCode: 400,
       body: JSON.stringify({
-        error: "Message and conversationId are required",
+        error: "userId, conversationId, and message are required",
       }),
     };
   }
 
   try {
+    // Fetch user settings from DynamoDB
+    const getUserParams = {
+      TableName,
+      Key: {
+        PK: { S: `userID#${userId}` },
+        SK: { S: `userID#${userId}` },
+      },
+    };
+
+    const getUserResult = await dynamoDbClient.send(
+      new GetItemCommand(getUserParams)
+    );
+    const userSettings = getUserResult.Item;
+
+    if (!userSettings) {
+      console.error("User settings not found for userId:", userId);
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ message: "User settings not found" }),
+      };
+    }
+
+    const memorySetting = userSettings.memorySetting.BOOL;
+    const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
+
+    let finalText = message;
     console.log("Sending message to LLM endpoint:", LLM_LAMBDA_ENDPOINT);
     const llmResponse = await axios.post(LLM_LAMBDA_ENDPOINT, { message });
 
@@ -55,7 +92,6 @@ exports.handler = async (event) => {
 
     console.log("LLM response received:", llmResponse.data);
 
-    // Parse the response directly as JSON
     const { message: llmMessage } = llmResponse.data;
 
     if (!llmMessage) {
@@ -64,9 +100,7 @@ exports.handler = async (event) => {
 
     console.log("Sanitized LLM message:", llmMessage);
 
-    // Ensure the message is in valid JSON format
     const parsedMessage = JSON.parse(llmMessage);
-
     const { processed_text, private_data } = parsedMessage;
 
     console.log("Private data:", private_data);
@@ -74,14 +108,19 @@ exports.handler = async (event) => {
       throw new Error("Invalid private_data received from LLM");
     }
 
+    finalText = processed_text;
+
     // Check if private_data is empty
     if (Object.keys(private_data).length > 0) {
       const params = {
         TableName,
-        Key: { conversationId: { S: conversationId } },
-        UpdateExpression: "set privateData = :pd",
+        Key: {
+          PK: { S: `userID#${userId}` },
+          SK: { S: `conversationID#${conversationId}` },
+        },
+        UpdateExpression: "set PIIData = :pd",
         ExpressionAttributeValues: {
-          ":pd": { S: JSON.stringify(private_data) }, // Ensure private_data is a string
+          ":pd": { S: JSON.stringify(private_data) },
         },
       };
 
@@ -94,10 +133,77 @@ exports.handler = async (event) => {
       console.log("No sensitive data found. Skipping DynamoDB update.");
     }
 
+    if (anonymizationSetting) {
+      let dataToSend = processed_text;
+
+      const params = {
+        TableName,
+        Key: {
+          PK: { S: `userID#${userId}` },
+          SK: { S: `conversationID#${conversationId}` },
+        },
+      };
+
+      console.log("Getting item from DynamoDB:", params);
+      const result = await dynamoDbClient.send(new GetItemCommand(params));
+
+      console.log("Result gotten from DynamoDB:", result);
+
+      if (!result.Item || !result.Item.connectionId) {
+        throw new Error(
+          "Connection ID not found for the given conversation ID"
+        );
+      }
+
+      const connectionId = result.Item.connectionId.S;
+      console.log("Connection ID retrieved:", connectionId);
+
+      console.log("WebSocket callback URL:", callbackUrl);
+
+      const postParams = {
+        ConnectionId: connectionId,
+        Data: JSON.stringify(dataToSend),
+      };
+
+      const command = new PostToConnectionCommand(postParams);
+      await apiGatewayClient.send(command);
+    }
+
+    // Optionally save the message to DynamoDB based on memorySetting
+    if (memorySetting) {
+      const updateParams = {
+        TableName,
+        Key: {
+          PK: { S: `userID#${userId}` },
+          SK: { S: `conversationID#${conversationId}` },
+        },
+        UpdateExpression:
+          "SET messages = list_append(if_not_exists(messages, :empty_list), :msg)",
+        ExpressionAttributeValues: {
+          ":empty_list": { L: [] },
+          ":msg": {
+            L: [
+              {
+                M: {
+                  messageId: { S: `msg-${new Date().getTime()}` },
+                  type: { S: "user" },
+                  text: { S: finalText },
+                  timestamp: { S: new Date().toISOString() },
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
+      console.log("Message saved to DynamoDB");
+    }
+
     console.log("Successfully processed message");
     return {
       statusCode: 200,
-      body: JSON.stringify({ anonymizedText: processed_text }),
+      body: JSON.stringify({ anonymizedText: finalText }),
     };
   } catch (error) {
     console.error("Error processing message:", error);

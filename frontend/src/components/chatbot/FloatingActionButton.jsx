@@ -1,9 +1,14 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 
-function FloatingActionButton({ openConnection, setIsChatbotOpen }) {
+function FloatingActionButton({
+  openConnection,
+  setIsChatbotOpen,
+  setIsTimedOut,
+}) {
   const openChatbot = () => {
     openConnection();
+    setIsTimedOut(false);
     setIsChatbotOpen(true);
   };
 

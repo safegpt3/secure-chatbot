@@ -6,7 +6,7 @@ const {
 } = require("@aws-sdk/client-apigatewaymanagementapi");
 
 const DEANONYMIZE_ENDPOINT = process.env.DEANONYMIZE_ENDPOINT;
-const TableName = process.env.CONNECTIONS_TABLE_NAME;
+const TableName = process.env.TABLE_NAME;
 const callbackUrl = process.env.CALLBACK_URL;
 
 const dynamoDbClient = new DynamoDBClient();
@@ -21,6 +21,7 @@ exports.handler = async (event) => {
   try {
     body = JSON.parse(event.body);
     messageType = body.type;
+    userId = body.userId;
     conversationId = body.conversationId;
     responseText = body.payload.text;
     console.log("Parsed request body:", body);
@@ -42,7 +43,30 @@ exports.handler = async (event) => {
   try {
     let dataToSend;
 
-    if (messageType === "text") {
+    // Fetch user settings from DynamoDB
+    const getUserParams = {
+      TableName,
+      Key: {
+        PK: { S: `userID#${userId}` },
+        SK: { S: `userID#${userId}` },
+      },
+    };
+
+    const getUserResult = await dynamoDbClient.send(
+      new GetItemCommand(getUserParams)
+    );
+    const userSettings = getUserResult.Item;
+
+    if (!userSettings) {
+      console.error("User settings not found for userId:", userId);
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ message: "User settings not found" }),
+      };
+    }
+    const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
+
+    if (messageType === "text" && !anonymizationSetting) {
       // Call the De-anonymize Service
       console.log(
         "Sending request to de-anonymize endpoint:",
@@ -74,13 +98,16 @@ exports.handler = async (event) => {
         text: responseText,
         options: body.payload.options,
       };
+    } else {
+      dataToSend = { text: responseText };
     }
 
     // Retrieve the connectionId from the DynamoDB table using the conversationId
     const params = {
       TableName,
       Key: {
-        conversationId: { S: conversationId },
+        PK: { S: `userID#${userId}` },
+        SK: { S: `conversationID#${conversationId}` },
       },
     };
 

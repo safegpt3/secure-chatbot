@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { jwtDecode } from "jwt-decode";
 
-const useAuth = () => {
-  // stub implementation
-
+const useAuth = (setUserId) => {
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("token");
     if (token) {
@@ -13,10 +12,14 @@ const useAuth = () => {
   }, []);
 
   const authenticateUser = (token) => {
-    console.log("authenticated user with token: ", token);
-    // You might want to set the user ID here based on the response from your server
-    // For example:
-    // setUserId(fetchedUserId);
+    try {
+      const decodedToken = jwtDecode(token);
+      const fetchedUserId = decodedToken.id;
+      console.log("Authenticated user with token: ", token);
+      setUserId(fetchedUserId);
+    } catch (error) {
+      console.error("Failed to decode token:", error);
+    }
   };
 
   return { authenticateUser };

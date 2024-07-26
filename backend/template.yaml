@@ -53,19 +53,19 @@ Resources:
       RouteKey: "$disconnect"
       Target: !Join ["", ["integrations/", !Ref DisconnectIntegration]]
 
-  DefaultRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref WebSocketApi
-      RouteKey: "$default"
-      Target: !Join ["", ["integrations/", !Ref DefaultIntegration]]
-
   SendRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref WebSocketApi
       RouteKey: "send"
       Target: !Join ["", ["integrations/", !Ref SendIntegration]]
+
+  UserSettingsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: "userSettings"
+      Target: !Join ["", ["integrations/", !Ref UserSettingsIntegration]]
 
   ConnectIntegration:
     Type: AWS::ApiGatewayV2::Integration
@@ -83,20 +83,20 @@ Resources:
       IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
       PayloadFormatVersion: "1.0"
 
-  DefaultIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref WebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDefaultFunction.Arn}/invocations
-      PayloadFormatVersion: "1.0"
-
   SendIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref WebSocketApi
       IntegrationType: AWS_PROXY
       IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+      PayloadFormatVersion: "1.0"
+
+  UserSettingsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UserSettingsFunction.Arn}/invocations
       PayloadFormatVersion: "1.0"
 
   OnConnectFunction:
@@ -107,7 +107,7 @@ Resources:
       Handler: index.handler
       Environment:
         Variables:
-          CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
+          TABLE_NAME: !Ref SecureChatbotTable
       Events:
         WebSocket:
           Type: Api
@@ -117,7 +117,7 @@ Resources:
             Method: post
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref SecureChatbotConnections
+            TableName: !Ref SecureChatbotTable
 
   OnConnectPermission:
     Type: AWS::Lambda::Permission
@@ -136,7 +136,7 @@ Resources:
       Handler: index.handler
       Environment:
         Variables:
-          CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
+          TABLE_NAME: !Ref SecureChatbotTable
       Events:
         WebSocket:
           Type: Api
@@ -146,7 +146,7 @@ Resources:
             Method: post
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref SecureChatbotConnections
+            TableName: !Ref SecureChatbotTable
 
   OnDisconnectPermission:
     Type: AWS::Lambda::Permission
@@ -156,20 +156,6 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref OnDisconnectFunction
       Principal: apigateway.amazonaws.com
-
-  OnDefaultFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "OnDefaultFunction-${Environment}"
-      CodeUri: chatbot/onDefault/
-      Handler: index.handler
-      Events:
-        WebSocket:
-          Type: Api
-          Properties:
-            RestApiId: !Ref WebSocketApi
-            Path: /$default
-            Method: post
 
   SendMessageFunction:
     Type: AWS::Serverless::Function
@@ -199,6 +185,32 @@ Resources:
       FunctionName: !Ref SendMessageFunction
       Principal: apigateway.amazonaws.com
 
+  UserSettingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "UserSettingsFunction-${Environment}"
+      CodeUri: chatbot/userSettings/
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref SecureChatbotTable
+      Events:
+        WebSocket:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebSocketApi
+            Path: /userSettings
+            Method: ANY
+
+  UserSettingsPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - WebSocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref UserSettingsFunction
+      Principal: apigateway.amazonaws.com
+
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -220,7 +232,8 @@ Resources:
       Environment:
         Variables:
           LLM_LAMBDA_ENDPOINT: !GetAtt LlmStubFunctionUrl.FunctionUrl
-          VAULT_TABLE_NAME: !Ref SecureChatbotVault
+          TABLE_NAME: !Ref SecureChatbotTable
+          CALLBACK_URL: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
       Events:
         AnonymizeApi:
           Type: HttpApi
@@ -233,7 +246,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:UpdateItem
-              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotVault}"
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   DeanonymizeMessageFunction:
     Type: AWS::Serverless::Function
@@ -243,7 +256,7 @@ Resources:
       Handler: index.handler
       Environment:
         Variables:
-          VAULT_TABLE_NAME: !Ref SecureChatbotVault
+          TABLE_NAME: !Ref SecureChatbotTable
       Events:
         DeanonymizeApi:
           Type: HttpApi
@@ -256,7 +269,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:GetItem
-              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotVault}"
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   ForwardMessageFunction:
     Type: AWS::Serverless::Function
@@ -267,7 +280,7 @@ Resources:
       Environment:
         Variables:
           DEANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/deanonymize"
-          CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
+          TABLE_NAME: !Ref SecureChatbotTable
           CALLBACK_URL: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
       Policies:
         - Statement:
@@ -393,141 +406,27 @@ Resources:
       Principal: "*"
       FunctionUrlAuthType: NONE
 
-  OnDeleteFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub "OnDeleteFunction-${Environment}"
-      CodeUri: chatbot/onDelete/
-      Handler: index.handler
-      Environment:
-        Variables:
-          CONNECTIONS_TABLE_NAME: !Ref SecureChatbotConnections
-          VAULT_TABLE_NAME: !Ref SecureChatbotVault
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-              Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotConnections}"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotConnections}/index/active-disconnectedAt-index"
-        - Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:BatchWriteItem
-              Resource:
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotConnections}"
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotVault}"
-
-  DeleteScheduler:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub "DeleteScheduler-${Environment}"
-      Description: "Trigger onDelete every 5 minutes"
-      ScheduleExpression: "rate(5 minutes)"
-      State: "ENABLED"
-      Targets:
-        - Id: "TargetFunction"
-          Arn: !GetAtt OnDeleteFunction.Arn
-          Input: '{"source": "EventBridgeScheduler"}'
-
-  LambdaInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt OnDeleteFunction.Arn
-      Action: "lambda:InvokeFunction"
-      Principal: "events.amazonaws.com"
-      SourceArn: !GetAtt DeleteScheduler.Arn
-
-  SecureChatbotVault:
+  SecureChatbotTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "secure-chatbot-vault-${Environment}"
+      TableName: !Sub "secure-chatbot-table-${Environment}"
       BillingMode: PROVISIONED
       AttributeDefinitions:
-        - AttributeName: "conversationId"
+        - AttributeName: "PK"
           AttributeType: "S"
-      KeySchema:
-        - AttributeName: "conversationId"
-          KeyType: "HASH"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
-
-  VaultReadScalingTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    Properties:
-      MaxCapacity: 5
-      MinCapacity: 1
-      ResourceId: !Sub "table/secure-chatbot-vault-${Environment}"
-      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
-      ServiceNamespace: "dynamodb"
-      RoleARN: !GetAtt AutoscalingRole.Arn
-
-  VaultWriteScalingTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    Properties:
-      MaxCapacity: 5
-      MinCapacity: 1
-      ResourceId: !Sub "table/secure-chatbot-vault-${Environment}"
-      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
-      ServiceNamespace: "dynamodb"
-      RoleARN: !GetAtt AutoscalingRole.Arn
-
-  VaultReadScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: "VaultReadCapacityUtilization"
-      PolicyType: "TargetTrackingScaling"
-      ScalingTargetId: !Ref VaultReadScalingTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70
-        PredefinedMetricSpecification:
-          PredefinedMetricType: "DynamoDBReadCapacityUtilization"
-
-  VaultWriteScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: "VaultWriteCapacityUtilization"
-      PolicyType: "TargetTrackingScaling"
-      ScalingTargetId: !Ref VaultWriteScalingTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70
-        PredefinedMetricSpecification:
-          PredefinedMetricType: "DynamoDBWriteCapacityUtilization"
-
-  SecureChatbotConnections:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub "secure-chatbot-connections-${Environment}"
-      BillingMode: PROVISIONED
-      AttributeDefinitions:
-        - AttributeName: "conversationId"
+        - AttributeName: "SK"
           AttributeType: "S"
         - AttributeName: "connectionId"
           AttributeType: "S"
-        - AttributeName: "active"
-          AttributeType: "S"
-        - AttributeName: "disconnectedAt"
-          AttributeType: "N"
       KeySchema:
-        - AttributeName: "conversationId"
+        - AttributeName: "PK"
           KeyType: "HASH"
+        - AttributeName: "SK"
+          KeyType: "RANGE"
       ProvisionedThroughput:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
       GlobalSecondaryIndexes:
-        - IndexName: "active-disconnectedAt-index"
-          KeySchema:
-            - AttributeName: "active"
-              KeyType: "HASH"
-            - AttributeName: "disconnectedAt"
-              KeyType: "RANGE"
-          Projection:
-            ProjectionType: "ALL"
-          ProvisionedThroughput:
-            ReadCapacityUnits: 1
-            WriteCapacityUnits: 1
         - IndexName: "connectionId-index"
           KeySchema:
             - AttributeName: "connectionId"
@@ -538,43 +437,43 @@ Resources:
             ReadCapacityUnits: 1
             WriteCapacityUnits: 1
 
-  ConnectionsReadScalingTarget:
+  SecureChatbotReadScalingTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
       MaxCapacity: 5
       MinCapacity: 1
-      ResourceId: !Sub "table/secure-chatbot-connections-${Environment}"
+      ResourceId: !Sub "table/secure-chatbot-table-${Environment}"
       ScalableDimension: "dynamodb:table:ReadCapacityUnits"
       ServiceNamespace: "dynamodb"
       RoleARN: !GetAtt AutoscalingRole.Arn
 
-  ConnectionsWriteScalingTarget:
+  SecureChatbotWriteScalingTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
       MaxCapacity: 5
       MinCapacity: 1
-      ResourceId: !Sub "table/secure-chatbot-connections-${Environment}"
+      ResourceId: !Sub "table/secure-chatbot-table-${Environment}"
       ScalableDimension: "dynamodb:table:WriteCapacityUnits"
       ServiceNamespace: "dynamodb"
       RoleARN: !GetAtt AutoscalingRole.Arn
 
-  ConnectionsReadScalingPolicy:
+  SecureChatbotReadScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties:
-      PolicyName: "ConnectionsReadCapacityUtilization"
+      PolicyName: "SecureChatbotReadCapacityUtilization"
       PolicyType: "TargetTrackingScaling"
-      ScalingTargetId: !Ref ConnectionsReadScalingTarget
+      ScalingTargetId: !Ref SecureChatbotReadScalingTarget
       TargetTrackingScalingPolicyConfiguration:
         TargetValue: 70
         PredefinedMetricSpecification:
           PredefinedMetricType: "DynamoDBReadCapacityUtilization"
 
-  ConnectionsWriteScalingPolicy:
+  SecureChatbotWriteScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties:
-      PolicyName: "ConnectionsWriteCapacityUtilization"
+      PolicyName: "SecureChatbotWriteCapacityUtilization"
       PolicyType: "TargetTrackingScaling"
-      ScalingTargetId: !Ref ConnectionsWriteScalingTarget
+      ScalingTargetId: !Ref SecureChatbotWriteScalingTarget
       TargetTrackingScalingPolicyConfiguration:
         TargetValue: 70
         PredefinedMetricSpecification:

@@ -1,6 +1,6 @@
 const { DynamoDBClient, GetItemCommand } = require("@aws-sdk/client-dynamodb");
 
-const TableName = process.env.VAULT_TABLE_NAME;
+const TableName = process.env.TABLE_NAME;
 
 const dynamoDbClient = new DynamoDBClient();
 
