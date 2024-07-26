@@ -2,7 +2,6 @@ const {
   DynamoDBClient,
   PutItemCommand,
   GetItemCommand,
-  QueryCommand,
   UpdateItemCommand,
 } = require("@aws-sdk/client-dynamodb");
 
@@ -28,50 +27,24 @@ exports.handler = async (event) => {
   let conversationId, message, userId;
   try {
     const requestBody = JSON.parse(event.body);
-    ({ conversationId, message } = requestBody);
+    ({ userId, conversationId, message } = requestBody);
     console.log("Parsed request body:", requestBody);
 
-    if (!conversationId || !message) {
-      console.error("Missing conversationId or message");
+    if (!userId || !conversationId || !message) {
+      console.error("Missing userId, conversationId, or message");
       return {
         statusCode: 400,
         body: JSON.stringify({
-          error: "conversationId and message are required",
+          error: "userId, conversationId, and message are required",
         }),
       };
     }
-
-    // Query to get the userId based on the conversationId
-    const queryParams = {
-      TableName,
-      IndexName: "conversationId-index", // Ensure you have this GSI created
-      KeyConditionExpression: "conversationId = :cid",
-      ExpressionAttributeValues: {
-        ":cid": { S: conversationId },
-      },
-    };
-
-    const queryResult = await dynamoDbClient.send(
-      new QueryCommand(queryParams)
-    );
-    if (queryResult.Items.length === 0) {
-      console.error("User ID not found for conversationId:", conversationId);
-      return {
-        statusCode: 404,
-        body: JSON.stringify({
-          message: "User ID not found for conversation ID",
-        }),
-      };
-    }
-
-    userId = queryResult.Items[0].PK.S.split("#")[1];
-    console.log("User ID found:", userId);
   } catch (error) {
     console.error("Error processing request:", error);
     return {
       statusCode: 400,
       body: JSON.stringify({
-        error: "Invalid request body or failed to fetch user ID",
+        error: "Invalid request body",
       }),
     };
   }

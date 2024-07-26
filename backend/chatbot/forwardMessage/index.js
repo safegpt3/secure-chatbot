@@ -1,5 +1,9 @@
 const axios = require("axios");
-const { DynamoDBClient, GetItemCommand } = require("@aws-sdk/client-dynamodb");
+const {
+  DynamoDBClient,
+  GetItemCommand,
+  QueryCommand,
+} = require("@aws-sdk/client-dynamodb");
 const {
   ApiGatewayManagementApiClient,
   PostToConnectionCommand,
@@ -17,11 +21,10 @@ const apiGatewayClient = new ApiGatewayManagementApiClient({
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
-  let conversationId, responseText, messageType, body;
+  let conversationId, responseText, messageType, body, userId;
   try {
     body = JSON.parse(event.body);
     messageType = body.type;
-    userId = body.userId;
     conversationId = body.conversationId;
     responseText = body.payload.text;
     console.log("Parsed request body:", body);
@@ -32,11 +35,42 @@ exports.handler = async (event) => {
         body: JSON.stringify({ message: "Message forwarded successfully" }),
       };
     }
+
+    // Query to get the userId based on the conversationId
+    const queryParams = {
+      TableName,
+      IndexName: "conversationId-index", // Ensure you have this GSI created
+      KeyConditionExpression: "conversationId = :cid",
+      ExpressionAttributeValues: {
+        ":cid": { S: conversationId },
+      },
+    };
+
+    const queryResult = await dynamoDbClient.send(
+      new QueryCommand(queryParams)
+    );
+    if (queryResult.Items.length === 0) {
+      console.error("User ID not found for conversationId:", conversationId);
+      return {
+        statusCode: 404,
+        body: JSON.stringify({
+          message: "User ID not found for conversation ID",
+        }),
+      };
+    }
+
+    userId = queryResult.Items[0].PK.S.split("#")[1];
+    console.log("User ID found:", userId);
   } catch (parseError) {
-    console.error("Error parsing request body:", parseError);
+    console.error(
+      "Error parsing request body or fetching user ID:",
+      parseError
+    );
     return {
       statusCode: 400,
-      body: JSON.stringify({ error: "Invalid request body" }),
+      body: JSON.stringify({
+        error: "Invalid request body or failed to fetch user ID",
+      }),
     };
   }
 
