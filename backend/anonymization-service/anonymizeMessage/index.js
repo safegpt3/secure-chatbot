@@ -45,9 +45,9 @@ exports.handler = async (event) => {
     const queryParams = {
       TableName,
       IndexName: "conversationId-index", // Ensure you have this GSI created
-      KeyConditionExpression: "SK = :sk",
+      KeyConditionExpression: "conversationId = :cid",
       ExpressionAttributeValues: {
-        ":sk": { S: `conversationID#${conversationId}` },
+        ":cid": { S: conversationId },
       },
     };
 
