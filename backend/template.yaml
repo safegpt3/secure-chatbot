@@ -58,7 +58,6 @@ Resources:
 
   SecureChatbotReadScalingTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: SecureChatbotTable
     Properties:
       MaxCapacity: 5
       MinCapacity: 1
@@ -69,7 +68,6 @@ Resources:
 
   SecureChatbotWriteScalingTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: SecureChatbotTable
     Properties:
       MaxCapacity: 5
       MinCapacity: 1
@@ -80,7 +78,6 @@ Resources:
 
   SecureChatbotReadScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    DependsOn: SecureChatbotReadScalingTarget
     Properties:
       PolicyName: "SecureChatbotReadCapacityUtilization"
       PolicyType: "TargetTrackingScaling"
@@ -92,7 +89,6 @@ Resources:
 
   SecureChatbotWriteScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    DependsOn: SecureChatbotWriteScalingTarget
     Properties:
       PolicyName: "SecureChatbotWriteCapacityUtilization"
       PolicyType: "TargetTrackingScaling"
