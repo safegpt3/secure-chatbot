@@ -281,6 +281,9 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /send
             Method: post
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SecureChatbotTable
 
   SendMessagePermission:
     Type: AWS::Lambda::Permission
@@ -353,7 +356,10 @@ Resources:
               Action:
                 - dynamodb:UpdateItem
                 - dynamodb:GetItem
-              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
+                - dynamodb:Query
+              Resource:
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}/index/conversationId-index"
 
   DeanonymizeMessageFunction:
     Type: AWS::Serverless::Function
