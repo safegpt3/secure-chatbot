@@ -1,7 +1,8 @@
 const {
   DynamoDBClient,
-  UpdateItemCommand,
+  PutItemCommand,
   GetItemCommand,
+  UpdateItemCommand,
 } = require("@aws-sdk/client-dynamodb");
 
 const {
@@ -39,7 +40,7 @@ exports.handler = async (event) => {
   }
 
   if (!userId || !conversationId || !message) {
-    console.error("Missing userId, or conversationId or message");
+    console.error("Missing userId, conversationId, or message");
     return {
       statusCode: 400,
       body: JSON.stringify({

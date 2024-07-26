@@ -118,6 +118,11 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref SecureChatbotTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   OnConnectPermission:
     Type: AWS::Lambda::Permission
@@ -168,6 +173,7 @@ Resources:
           ANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/anonymize"
           BOTPRESS_TOKEN: !Ref BotpressToken
           BOTPRESS_ENDPOINT: !Ref BotpressEndpoint
+          TABLE_NAME: !Ref SecureChatbotTable
       Events:
         WebSocket:
           Type: Api
@@ -175,6 +181,13 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /send
             Method: post
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   SendMessagePermission:
     Type: AWS::Lambda::Permission
@@ -201,6 +214,9 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /userSettings
             Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SecureChatbotTable
 
   UserSettingsPermission:
     Type: AWS::Lambda::Permission
@@ -245,6 +261,7 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
