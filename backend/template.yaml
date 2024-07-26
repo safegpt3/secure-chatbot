@@ -25,6 +25,105 @@ Globals:
     Runtime: nodejs20.x
 
 Resources:
+  SecureChatbotTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "secure-chatbot-table-${Environment}"
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: "PK"
+          AttributeType: "S"
+        - AttributeName: "SK"
+          AttributeType: "S"
+        - AttributeName: "connectionId"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "PK"
+          KeyType: "HASH"
+        - AttributeName: "SK"
+          KeyType: "RANGE"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      GlobalSecondaryIndexes:
+        - IndexName: "connectionId-index"
+          KeySchema:
+            - AttributeName: "connectionId"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+
+  SecureChatbotReadScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: SecureChatbotTable
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      ResourceId: !Sub "table/secure-chatbot-table-${Environment}"
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: "dynamodb"
+      RoleARN: !GetAtt AutoscalingRole.Arn
+
+  SecureChatbotWriteScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: SecureChatbotTable
+    Properties:
+      MaxCapacity: 5
+      MinCapacity: 1
+      ResourceId: !Sub "table/secure-chatbot-table-${Environment}"
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: "dynamodb"
+      RoleARN: !GetAtt AutoscalingRole.Arn
+
+  SecureChatbotReadScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: SecureChatbotReadScalingTarget
+    Properties:
+      PolicyName: "SecureChatbotReadCapacityUtilization"
+      PolicyType: "TargetTrackingScaling"
+      ScalingTargetId: !Ref SecureChatbotReadScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        PredefinedMetricSpecification:
+          PredefinedMetricType: "DynamoDBReadCapacityUtilization"
+
+  SecureChatbotWriteScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: SecureChatbotWriteScalingTarget
+    Properties:
+      PolicyName: "SecureChatbotWriteCapacityUtilization"
+      PolicyType: "TargetTrackingScaling"
+      ScalingTargetId: !Ref SecureChatbotWriteScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        PredefinedMetricSpecification:
+          PredefinedMetricType: "DynamoDBWriteCapacityUtilization"
+
+  AutoscalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "AutoscalingRole-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "application-autoscaling.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "DynamoDBAutoscalingPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "dynamodb:UpdateTable"
+                  - "dynamodb:DescribeTable"
+                Resource: "*"
+
   WebSocketApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
@@ -118,11 +217,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref SecureChatbotTable
-        - Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:GetItem
-              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   OnConnectPermission:
     Type: AWS::Lambda::Permission
@@ -173,7 +267,6 @@ Resources:
           ANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/anonymize"
           BOTPRESS_TOKEN: !Ref BotpressToken
           BOTPRESS_ENDPOINT: !Ref BotpressEndpoint
-          TABLE_NAME: !Ref SecureChatbotTable
       Events:
         WebSocket:
           Type: Api
@@ -181,13 +274,6 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /send
             Method: post
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:UpdateItem
-              Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   SendMessagePermission:
     Type: AWS::Lambda::Permission
@@ -214,9 +300,6 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /userSettings
             Method: ANY
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref SecureChatbotTable
 
   UserSettingsPermission:
     Type: AWS::Lambda::Permission
@@ -261,8 +344,8 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
-                - dynamodb:GetItem
                 - dynamodb:UpdateItem
+                - dynamodb:GetItem
               Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   DeanonymizeMessageFunction:
@@ -422,103 +505,6 @@ Resources:
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
       FunctionUrlAuthType: NONE
-
-  SecureChatbotTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub "secure-chatbot-table-${Environment}"
-      BillingMode: PROVISIONED
-      AttributeDefinitions:
-        - AttributeName: "PK"
-          AttributeType: "S"
-        - AttributeName: "SK"
-          AttributeType: "S"
-        - AttributeName: "connectionId"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "PK"
-          KeyType: "HASH"
-        - AttributeName: "SK"
-          KeyType: "RANGE"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
-      GlobalSecondaryIndexes:
-        - IndexName: "connectionId-index"
-          KeySchema:
-            - AttributeName: "connectionId"
-              KeyType: "HASH"
-          Projection:
-            ProjectionType: "ALL"
-          ProvisionedThroughput:
-            ReadCapacityUnits: 1
-            WriteCapacityUnits: 1
-
-  SecureChatbotReadScalingTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: SecureChatbotTable
-    Properties:
-      MaxCapacity: 5
-      MinCapacity: 1
-      ResourceId: !Sub "table/secure-chatbot-table-${Environment}"
-      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
-      ServiceNamespace: "dynamodb"
-      RoleARN: !GetAtt AutoscalingRole.Arn
-
-  SecureChatbotWriteScalingTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: SecureChatbotTable
-    Properties:
-      MaxCapacity: 5
-      MinCapacity: 1
-      ResourceId: !Sub "table/secure-chatbot-table-${Environment}"
-      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
-      ServiceNamespace: "dynamodb"
-      RoleARN: !GetAtt AutoscalingRole.Arn
-
-  SecureChatbotReadScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: "SecureChatbotReadCapacityUtilization"
-      PolicyType: "TargetTrackingScaling"
-      ScalingTargetId: !Ref SecureChatbotReadScalingTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70
-        PredefinedMetricSpecification:
-          PredefinedMetricType: "DynamoDBReadCapacityUtilization"
-
-  SecureChatbotWriteScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: "SecureChatbotWriteCapacityUtilization"
-      PolicyType: "TargetTrackingScaling"
-      ScalingTargetId: !Ref SecureChatbotWriteScalingTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70
-        PredefinedMetricSpecification:
-          PredefinedMetricType: "DynamoDBWriteCapacityUtilization"
-
-  AutoscalingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "AutoscalingRole-${Environment}"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: "Allow"
-            Principal:
-              Service: "application-autoscaling.amazonaws.com"
-            Action: "sts:AssumeRole"
-      Policies:
-        - PolicyName: "DynamoDBAutoscalingPolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: "Allow"
-                Action:
-                  - "dynamodb:UpdateTable"
-                  - "dynamodb:DescribeTable"
-                Resource: "*"
 
 Outputs:
   WebSocketApiEndpoint:
