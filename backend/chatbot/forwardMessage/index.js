@@ -103,8 +103,9 @@ exports.handler = async (event) => {
       };
     }
     const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
+    const memorySetting = userSettings.memorySetting.BOOL;
 
-    if (messageType === "text" && !anonymizationSetting) {
+    if (messageType === "text" && anonymizationSetting) {
       const deanonymizeResponse = await axios.post(DEANONYMIZE_ENDPOINT, {
         anonymizedText: responseText,
         conversationId: conversationId,
@@ -152,6 +153,37 @@ exports.handler = async (event) => {
 
     const command = new PostToConnectionCommand(postParams);
     await apiGatewayClient.send(command);
+
+    // Optionally save the message to DynamoDB based on memorySetting
+    if (memorySetting) {
+      const updateParams = {
+        TableName,
+        Key: {
+          PK: { S: `userID#${userId}` },
+          SK: { S: `conversationID#${conversationId}` },
+        },
+        UpdateExpression:
+          "SET messages = list_append(if_not_exists(messages, :empty_list), :msg)",
+        ExpressionAttributeValues: {
+          ":empty_list": { L: [] },
+          ":msg": {
+            L: [
+              {
+                M: {
+                  messageId: { S: `msg-${new Date().getTime()}` },
+                  type: { S: "bot" },
+                  text: { S: dataToSend },
+                  timestamp: { S: new Date().toISOString() },
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
+      console.log("Message saved to DynamoDB");
+    }
 
     return {
       statusCode: 200,
