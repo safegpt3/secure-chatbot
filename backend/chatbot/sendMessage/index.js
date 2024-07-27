@@ -30,12 +30,38 @@ exports.handler = async (event) => {
   try {
     let finalText = text;
 
+    // Fetch user settings from DynamoDB
+    const getUserParams = {
+      TableName,
+      Key: {
+        PK: { S: `userID#${userId}` },
+        SK: { S: `userID#${userId}` },
+      },
+    };
+
+    const getUserResult = await dynamoDbClient.send(
+      new GetItemCommand(getUserParams)
+    );
+    const userSettings = getUserResult.Item;
+
+    if (!userSettings) {
+      console.error("User settings not found for userId:", userId);
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ message: "User settings not found" }),
+      };
+    }
+
+    const memorySetting = userSettings.memorySetting.BOOL;
+    const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
+
     if (internalType === "text") {
       console.log("Sending message to anonymize endpoint:", ANONYMIZE_ENDPOINT);
       const anonymizeResponse = await axios.post(ANONYMIZE_ENDPOINT, {
         userId,
         conversationId,
         message: text,
+        anonymizationSetting: anonymizationSetting,
       });
       console.log("Anonymize response received:", anonymizeResponse.data);
 
@@ -56,6 +82,37 @@ exports.handler = async (event) => {
       { headers: { Authorization: `Bearer ${BOTPRESS_TOKEN}` } }
     );
     console.log("Botpress response received:", botResponse.data);
+
+    // Optionally save the message to DynamoDB based on memorySetting
+    if (memorySetting) {
+      const updateParams = {
+        TableName,
+        Key: {
+          PK: { S: `userID#${userId}` },
+          SK: { S: `conversationID#${conversationId}` },
+        },
+        UpdateExpression:
+          "SET messages = list_append(if_not_exists(messages, :empty_list), :msg)",
+        ExpressionAttributeValues: {
+          ":empty_list": { L: [] },
+          ":msg": {
+            L: [
+              {
+                M: {
+                  messageId: { S: `msg-${new Date().getTime()}` },
+                  type: { S: "user" },
+                  text: { S: finalText },
+                  timestamp: { S: new Date().toISOString() },
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
+      console.log("Message saved to DynamoDB");
+    }
 
     return {
       statusCode: 200,

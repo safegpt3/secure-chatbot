@@ -27,10 +27,10 @@ exports.handler = async (event) => {
   let conversationId, message, userId;
   try {
     const requestBody = JSON.parse(event.body);
-    ({ userId, conversationId, message } = requestBody);
+    ({ userId, conversationId, message, anonymizationSetting } = requestBody);
     console.log("Parsed request body:", requestBody);
 
-    if (!userId || !conversationId || !message) {
+    if (!userId || !conversationId || !message || !anonymizationSetting) {
       console.error("Missing userId, conversationId, or message");
       return {
         statusCode: 400,
@@ -50,31 +50,6 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Fetch user settings from DynamoDB
-    const getUserParams = {
-      TableName,
-      Key: {
-        PK: { S: `userID#${userId}` },
-        SK: { S: `userID#${userId}` },
-      },
-    };
-
-    const getUserResult = await dynamoDbClient.send(
-      new GetItemCommand(getUserParams)
-    );
-    const userSettings = getUserResult.Item;
-
-    if (!userSettings) {
-      console.error("User settings not found for userId:", userId);
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ message: "User settings not found" }),
-      };
-    }
-
-    const memorySetting = userSettings.memorySetting.BOOL;
-    const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
-
     let finalText = message;
     console.log("Sending message to LLM endpoint:", LLM_LAMBDA_ENDPOINT);
     const llmResponse = await axios.post(LLM_LAMBDA_ENDPOINT, { message });
@@ -168,37 +143,6 @@ exports.handler = async (event) => {
 
       const command = new PostToConnectionCommand(postParams);
       await apiGatewayClient.send(command);
-    }
-
-    // Optionally save the message to DynamoDB based on memorySetting
-    if (memorySetting) {
-      const updateParams = {
-        TableName,
-        Key: {
-          PK: { S: `userID#${userId}` },
-          SK: { S: `conversationID#${conversationId}` },
-        },
-        UpdateExpression:
-          "SET messages = list_append(if_not_exists(messages, :empty_list), :msg)",
-        ExpressionAttributeValues: {
-          ":empty_list": { L: [] },
-          ":msg": {
-            L: [
-              {
-                M: {
-                  messageId: { S: `msg-${new Date().getTime()}` },
-                  type: { S: "user" },
-                  text: { S: finalText },
-                  timestamp: { S: new Date().toISOString() },
-                },
-              },
-            ],
-          },
-        },
-      };
-
-      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
-      console.log("Message saved to DynamoDB");
     }
 
     console.log("Successfully processed message");
