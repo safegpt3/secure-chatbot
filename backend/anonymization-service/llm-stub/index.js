@@ -104,13 +104,24 @@ Perform the same steps for the provided input text:`,
     );
 
     if (response.status === 200) {
-      const generatedText = response.data.choices[0].message.content.trim();
-      console.log("Generated text:", generatedText);
+      let generatedText = response.data.choices[0].message.content.trim();
 
-      // Assuming the generated text is a plain text message, not JSON
+      // Strip out Markdown delimiters if present
+      if (
+        generatedText.startsWith("```json") &&
+        generatedText.endsWith("```")
+      ) {
+        generatedText = generatedText.slice(7, -3).trim();
+      }
+
+      console.log("Generated text after stripping Markdown:", generatedText);
+
+      const parsedResponse = JSON.parse(generatedText);
+      console.log("Parsed response:", parsedResponse);
+
       return {
         statusCode: 200,
-        body: JSON.stringify({ message: generatedText }),
+        body: JSON.stringify(parsedResponse),
       };
     } else {
       console.error(
