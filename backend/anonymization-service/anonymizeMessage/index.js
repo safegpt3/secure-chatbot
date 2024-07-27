@@ -134,7 +134,7 @@ exports.handler = async (event) => {
       console.log("No sensitive data found. Skipping DynamoDB update.");
     }
 
-    if (anonymizationSetting) {
+    if (!anonymizationSetting) {
       let dataToSend = processed_text;
 
       const params = {
