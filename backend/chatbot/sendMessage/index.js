@@ -1,5 +1,9 @@
 const axios = require("axios");
-const { DynamoDBClient, GetItemCommand } = require("@aws-sdk/client-dynamodb");
+const {
+  DynamoDBClient,
+  GetItemCommand,
+  UpdateItemCommand,
+} = require("@aws-sdk/client-dynamodb");
 
 const ANONYMIZE_ENDPOINT = process.env.ANONYMIZE_ENDPOINT;
 const BOTPRESS_ENDPOINT = process.env.BOTPRESS_ENDPOINT;
@@ -110,7 +114,7 @@ exports.handler = async (event) => {
         },
       };
 
-      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
+      await dynamoDbClient.send(new UpdateItemCommand(updateParams)); // Use UpdateItemCommand here
       console.log("Message saved to DynamoDB");
     }
 
