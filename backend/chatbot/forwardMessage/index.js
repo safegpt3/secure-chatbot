@@ -39,16 +39,17 @@ exports.handler = async (event) => {
     // Query to get the userId based on the conversationId
     const queryParams = {
       TableName,
-      IndexName: "conversationId-index", // Ensure you have this GSI created
+      IndexName: "conversationId-index",
       KeyConditionExpression: "conversationId = :cid",
       ExpressionAttributeValues: {
-        ":cid": { S: conversationId },
+        ":cid": { S: `conversationID#${conversationId}` },
       },
     };
 
     const queryResult = await dynamoDbClient.send(
       new QueryCommand(queryParams)
     );
+
     if (queryResult.Items.length === 0) {
       console.error("User ID not found for conversationId:", conversationId);
       return {
