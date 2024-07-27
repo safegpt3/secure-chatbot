@@ -55,6 +55,7 @@ exports.handler = async (event) => {
       Item: {
         PK: { S: `userID#${userId}` },
         SK: { S: `conversationID#${conversationId}` },
+        conversationId: { S: conversationId },
         connectionId: { S: connectionId },
         messages: { L: [] },
         status: { S: "active" },

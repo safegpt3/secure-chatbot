@@ -66,7 +66,7 @@ exports.handler = async (event) => {
       IndexName: "conversationId-index",
       KeyConditionExpression: "conversationId = :cid",
       ExpressionAttributeValues: {
-        ":cid": { S: `conversationID#${conversationId}` },
+        ":cid": { S: `${conversationId}` },
       },
     };
 
