@@ -6,10 +6,12 @@ import useConversation from "@/hooks/useConversation";
 import useWebSocket from "@/hooks/useWebSocket";
 import { v4 as uuidv4 } from "uuid";
 
+import DebugPannel from "@/components/chatbot/DebugPannel";
+
 function ChatbotPage() {
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
-  const [userId, setUserId] = useState("1234abcd");
+  const [userId, setUserId] = useState("");
 
   const [conversationId, setConversationId] = useState(
     localStorage.getItem("conversationId") || uuidv4()
@@ -23,8 +25,10 @@ function ChatbotPage() {
   const wsRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isTimedOut, setIsTimedOut] = useState(false);
+  const [isDataVisible, setIsDataVisible] = useState(true);
 
-  useAuth(userId, setUserId);
+  useAuth(setUserId);
 
   const { handleNewMessage, resetConversation } = useConversation(
     conversationId,
@@ -33,23 +37,26 @@ function ChatbotPage() {
     setConversation
   );
 
-  const { openConnection, closeConnection, sendMessage } = useWebSocket(
+  const { openConnection, sendMessage } = useWebSocket(
     wsRef,
-    isConnected,
     setIsConnected,
-    isSending,
     setIsSending,
+    setIsTimedOut,
     conversationId,
-    handleNewMessage
+    handleNewMessage,
+    userId
   );
 
   return (
     <>
-      <div>
-        <p>conversationId: {conversationId}</p>
-        <p>userId: {userId}</p>
-        <p>Is websocket connected: {isConnected.toString()}</p>
-      </div>
+      <DebugPannel
+        conversationId={conversationId}
+        userId={userId}
+        isConnected={isConnected}
+        isTimedOut={isTimedOut}
+        isDataVisible={isDataVisible}
+        setIsDataVisible={setIsDataVisible}
+      />
       {isChatbotOpen ? (
         <Chatbot
           userId={userId}
@@ -59,8 +66,8 @@ function ChatbotPage() {
           resetConversation={resetConversation}
           isConnected={isConnected}
           isSending={isSending}
+          isTimedOut={isTimedOut}
           openConnection={openConnection}
-          closeConnection={closeConnection}
           sendMessage={sendMessage}
           setIsChatbotOpen={setIsChatbotOpen}
         />
@@ -68,6 +75,7 @@ function ChatbotPage() {
         <FloatingActionButton
           openConnection={openConnection}
           setIsChatbotOpen={setIsChatbotOpen}
+          setIsTimedOut={setIsTimedOut}
         />
       )}
     </>

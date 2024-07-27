@@ -1,16 +1,16 @@
 const { DynamoDBClient, GetItemCommand } = require("@aws-sdk/client-dynamodb");
 
-const TableName = process.env.VAULT_TABLE_NAME;
+const TableName = process.env.TABLE_NAME;
 
 const dynamoDbClient = new DynamoDBClient();
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
-  let anonymizedText, conversationId;
+  let anonymizedText, conversationId, userId;
   try {
     const requestBody = JSON.parse(event.body);
-    ({ anonymizedText, conversationId } = requestBody);
+    ({ anonymizedText, conversationId, userId } = requestBody);
     console.log("Parsed request body:", requestBody);
   } catch (parseError) {
     console.error("Error parsing request body:", parseError);
@@ -22,35 +22,32 @@ exports.handler = async (event) => {
     };
   }
 
-  if (!anonymizedText || !conversationId) {
-    console.error("Missing anonymizedResponse or conversationId");
+  if (!anonymizedText || !conversationId || !userId) {
+    console.error("Missing anonymizedText, conversationId, or userId");
     return {
       statusCode: 400,
       body: JSON.stringify({
-        error: "Anonymized response and conversationId are required",
+        error: "Anonymized text, conversationId, and userId are required",
       }),
     };
   }
 
-  const params = {
+  const getItemParams = {
     TableName,
     Key: {
-      conversationId: { S: conversationId },
+      PK: { S: `userID#${userId}` },
+      SK: { S: `conversationID#${conversationId}` },
     },
   };
 
   try {
-    console.log("Getting item from DynamoDB:", params);
-    const result = await dynamoDbClient.send(new GetItemCommand(params));
+    console.log("Getting item from DynamoDB with params:", getItemParams);
+    const getItemResult = await dynamoDbClient.send(
+      new GetItemCommand(getItemParams)
+    );
 
-    if (
-      !result.Item ||
-      !result.Item.privateData ||
-      Object.keys(JSON.parse(result.Item.privateData.S)).length === 0
-    ) {
-      console.log(
-        "No sensitive data found for the provided conversationId or sensitive data is empty."
-      );
+    if (!getItemResult.Item || !getItemResult.Item.PII) {
+      console.log("No sensitive data found for the provided conversationId");
       return {
         statusCode: 200,
         body: JSON.stringify({ deanonymizedText: anonymizedText }),
@@ -58,7 +55,7 @@ exports.handler = async (event) => {
     }
 
     // Parse private data
-    const privateData = JSON.parse(result.Item.privateData.S);
+    const privateData = JSON.parse(getItemResult.Item.PII.S);
     console.log("Private data retrieved:", privateData);
 
     let deanonymizedResponse = anonymizedText;

@@ -1,10 +1,9 @@
-//onConnect
-
 const {
   DynamoDBClient,
-  UpdateItemCommand,
+  PutItemCommand,
+  GetItemCommand,
 } = require("@aws-sdk/client-dynamodb");
-const TableName = process.env.CONNECTIONS_TABLE_NAME;
+const TableName = process.env.TABLE_NAME;
 
 const docClient = new DynamoDBClient();
 
@@ -13,24 +12,60 @@ exports.handler = async (event) => {
 
   const connectionId = event.requestContext.connectionId;
   const conversationId = event.queryStringParameters.conversationId;
+  const userId = event.queryStringParameters.userId;
 
-  if (!conversationId) {
-    console.error("Missing conversationId in query parameters");
-    return { statusCode: 400, body: "Missing conversationId" };
+  if (!conversationId || !userId) {
+    console.error("Missing conversationId or userId in query parameters");
+    return { statusCode: 400, body: "Missing conversationId or userId" };
   }
 
   try {
-    const params = {
+    // Check if the user already exists
+    const getUserParams = {
       TableName,
-      Key: { conversationId: { S: conversationId } },
-      UpdateExpression:
-        "set connectionId = :c, active = :a remove disconnectedAt",
-      ExpressionAttributeValues: {
-        ":c": { S: connectionId },
-        ":a": { S: "true" },
+      Key: {
+        PK: { S: `userID#${userId}` },
+        SK: { S: `userID#${userId}` },
       },
     };
-    await docClient.send(new UpdateItemCommand(params));
+
+    const getUserResult = await docClient.send(
+      new GetItemCommand(getUserParams)
+    );
+
+    if (!getUserResult.Item) {
+      // Create user entry if it doesn't exist
+      const createUserParams = {
+        TableName,
+        Item: {
+          PK: { S: `userID#${userId}` },
+          SK: { S: `userID#${userId}` },
+          userId: { S: userId },
+          PII: { M: {} },
+          memorySetting: { S: "" },
+          anonymizationSetting: { S: "" },
+        },
+      };
+      await docClient.send(new PutItemCommand(createUserParams));
+    }
+
+    // Update or create the conversation entry
+    const updateConversationParams = {
+      TableName,
+      Item: {
+        PK: { S: `userID#${userId}` },
+        SK: { S: `conversationID#${conversationId}` },
+        conversationId: { S: conversationId },
+        connectionId: { S: connectionId },
+        messages: { L: [] },
+        status: { S: "active" },
+        createdAt: { S: new Date().toISOString() },
+        disconnectedAt: { NULL: true },
+      },
+    };
+
+    await docClient.send(new PutItemCommand(updateConversationParams));
+
     return { statusCode: 200, body: "Connected." };
   } catch (err) {
     console.error("Failed to process connection:", err);

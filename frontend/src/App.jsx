@@ -1,10 +1,12 @@
 import React from "react";
 import ChatbotPage from "./pages/ChatbotPage";
 
-//Comment - testing feature branch CI
-
 function App() {
-  return <ChatbotPage />;
+  return (
+    <React.StrictMode>
+      <ChatbotPage />
+    </React.StrictMode>
+  );
 }
 
 export default App;

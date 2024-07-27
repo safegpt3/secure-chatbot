@@ -1,30 +1,45 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect } from "react";
 
 const useWebSocket = (
   wsRef,
-  isConnected,
   setIsConnected,
-  isSending,
   setIsSending,
+  setIsTimedOut,
   conversationId,
-  handleNewMessage
+  handleNewMessage,
+  userId
 ) => {
-  const wsURL = import.meta.env.VITE_WS_URL;
-
-  const firstRenderRef = useRef(true);
+  const constructWsUrl = (baseUrl, conversationId, userId) => {
+    const url = new URL(baseUrl);
+    url.searchParams.append("conversationId", conversationId);
+    if (userId) {
+      url.searchParams.append("userId", userId);
+    }
+    return url.toString();
+  };
 
   const openConnection = () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      wsRef.current = new WebSocket(wsURL + conversationId);
+      const wsURL = constructWsUrl(
+        import.meta.env.VITE_WS_URL,
+        conversationId,
+        userId
+      );
+      console.log("wsURL: ", wsURL);
+      wsRef.current = new WebSocket(wsURL);
 
       wsRef.current.onopen = () => {
         console.log("onopen - WebSocket connection opened");
         setIsConnected(true);
+        setIsTimedOut(false);
       };
 
       wsRef.current.onclose = (event) => {
         console.log("onclose - WebSocket connection closed", event);
         setIsConnected(false);
+        if (event.code === 1001) {
+          setIsTimedOut(true);
+        }
       };
 
       wsRef.current.onmessage = (event) => {
@@ -64,13 +79,11 @@ const useWebSocket = (
   };
 
   useEffect(() => {
-    if (firstRenderRef.current) {
-      firstRenderRef.current = false;
-    } else {
+    if (userId && conversationId) {
       closeConnection();
       openConnection();
     }
-  }, [conversationId]);
+  }, [conversationId, userId]);
 
   useEffect(() => {
     return () => {

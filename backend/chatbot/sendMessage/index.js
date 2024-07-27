@@ -1,8 +1,12 @@
 const axios = require("axios");
+const { DynamoDBClient, GetItemCommand } = require("@aws-sdk/client-dynamodb");
 
 const ANONYMIZE_ENDPOINT = process.env.ANONYMIZE_ENDPOINT;
 const BOTPRESS_ENDPOINT = process.env.BOTPRESS_ENDPOINT;
 const BOTPRESS_TOKEN = process.env.BOTPRESS_TOKEN;
+const TableName = process.env.TABLE_NAME;
+
+const docClient = new DynamoDBClient();
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
@@ -29,8 +33,9 @@ exports.handler = async (event) => {
     if (internalType === "text") {
       console.log("Sending message to anonymize endpoint:", ANONYMIZE_ENDPOINT);
       const anonymizeResponse = await axios.post(ANONYMIZE_ENDPOINT, {
-        message: text,
+        userId,
         conversationId,
+        message: text,
       });
       console.log("Anonymize response received:", anonymizeResponse.data);
 
