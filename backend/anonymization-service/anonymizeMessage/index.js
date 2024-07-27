@@ -92,9 +92,9 @@ exports.handler = async (event) => {
         TableName,
         Key: {
           PK: { S: `userID#${userId}` },
-          SK: { S: `conversationID#${conversationId}` },
+          SK: { S: `userID#${userID}` },
         },
-        UpdateExpression: "set PIIData = :pd",
+        UpdateExpression: "set PII = :pd",
         ExpressionAttributeValues: {
           ":pd": { S: JSON.stringify(private_data) },
         },
