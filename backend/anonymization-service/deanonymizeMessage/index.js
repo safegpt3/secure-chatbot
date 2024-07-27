@@ -45,6 +45,7 @@ exports.handler = async (event) => {
     const getItemResult = await dynamoDbClient.send(
       new GetItemCommand(getItemParams)
     );
+    console.log("GetItem result:", JSON.stringify(getItemResult, null, 2));
 
     if (!getItemResult.Item || !getItemResult.Item.PII) {
       console.log("No sensitive data found for the provided conversationId");
@@ -54,9 +55,30 @@ exports.handler = async (event) => {
       };
     }
 
+    // Ensure the PII attribute is a valid JSON string
+    if (!getItemResult.Item.PII.S) {
+      console.error(
+        "PII attribute is not a valid JSON string:",
+        getItemResult.Item.PII
+      );
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "PII attribute is not valid JSON" }),
+      };
+    }
+
     // Parse private data
-    const privateData = JSON.parse(getItemResult.Item.PII.S);
-    console.log("Private data retrieved:", privateData);
+    let privateData;
+    try {
+      privateData = JSON.parse(getItemResult.Item.PII.S);
+      console.log("Private data retrieved:", privateData);
+    } catch (jsonParseError) {
+      console.error("Error parsing PII attribute as JSON:", jsonParseError);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Error parsing PII attribute as JSON" }),
+      };
+    }
 
     let deanonymizedResponse = anonymizedText;
 
