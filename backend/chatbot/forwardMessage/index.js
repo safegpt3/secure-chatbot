@@ -108,6 +108,7 @@ exports.handler = async (event) => {
       const deanonymizeResponse = await axios.post(DEANONYMIZE_ENDPOINT, {
         anonymizedText: responseText,
         conversationId: conversationId,
+        userId: userId,
       });
 
       if (deanonymizeResponse.status !== 200) {
