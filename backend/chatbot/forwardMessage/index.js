@@ -46,11 +46,15 @@ exports.handler = async (event) => {
       },
     };
 
+    console.log("Query params:", JSON.stringify(queryParams, null, 2));
+
     const queryResult = await dynamoDbClient.send(
       new QueryCommand(queryParams)
     );
 
-    if (queryResult.Items.length === 0) {
+    console.log("Query result:", JSON.stringify(queryResult, null, 2));
+
+    if (!queryResult.Items || queryResult.Items.length === 0) {
       console.error("User ID not found for conversationId:", conversationId);
       return {
         statusCode: 404,
@@ -146,10 +150,13 @@ exports.handler = async (event) => {
       },
     };
 
-    console.log("Getting item from DynamoDB:", params);
+    console.log("Getting item from DynamoDB:", JSON.stringify(params, null, 2));
     const result = await dynamoDbClient.send(new GetItemCommand(params));
 
-    console.log("Result gotten from DynamoDB:", result);
+    console.log(
+      "Result gotten from DynamoDB:",
+      JSON.stringify(result, null, 2)
+    );
 
     if (!result.Item || !result.Item.connectionId) {
       throw new Error("Connection ID not found for the given conversation ID");
@@ -181,4 +188,3 @@ exports.handler = async (event) => {
     };
   }
 };
-//Test
