@@ -6,7 +6,7 @@ const BOTPRESS_ENDPOINT = process.env.BOTPRESS_ENDPOINT;
 const BOTPRESS_TOKEN = process.env.BOTPRESS_TOKEN;
 const TableName = process.env.TABLE_NAME;
 
-const docClient = new DynamoDBClient();
+const dynamoDbClient = new DynamoDBClient();
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
