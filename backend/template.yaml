@@ -274,6 +274,7 @@ Resources:
           ANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/anonymize"
           BOTPRESS_TOKEN: !Ref BotpressToken
           BOTPRESS_ENDPOINT: !Ref BotpressEndpoint
+          TABLE_NAME: !Ref SecureChatbotTable
       Events:
         WebSocket:
           Type: Api
