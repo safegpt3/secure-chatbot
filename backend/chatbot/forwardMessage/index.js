@@ -3,6 +3,7 @@ const {
   DynamoDBClient,
   GetItemCommand,
   QueryCommand,
+  ScanCommand,
 } = require("@aws-sdk/client-dynamodb");
 const {
   ApiGatewayManagementApiClient,
@@ -56,6 +57,15 @@ exports.handler = async (event) => {
 
     if (!queryResult.Items || queryResult.Items.length === 0) {
       console.error("User ID not found for conversationId:", conversationId);
+
+      // Perform a scan operation for debugging
+      console.log("Performing scan operation for debugging...");
+      const scanParams = {
+        TableName,
+      };
+      const scanResult = await dynamoDbClient.send(new ScanCommand(scanParams));
+      console.log("Scan result:", JSON.stringify(scanResult, null, 2));
+
       return {
         statusCode: 404,
         body: JSON.stringify({
