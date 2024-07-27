@@ -4,6 +4,7 @@ const {
   GetItemCommand,
   QueryCommand,
   ScanCommand,
+  DescribeTableCommand,
 } = require("@aws-sdk/client-dynamodb");
 const {
   ApiGatewayManagementApiClient,
@@ -35,6 +36,28 @@ exports.handler = async (event) => {
         statusCode: 200,
         body: JSON.stringify({ message: "Message forwarded successfully" }),
       };
+    }
+
+    // Describe the table to check the status of the index
+    const describeTableParams = {
+      TableName,
+    };
+    const tableDescription = await dynamoDbClient.send(
+      new DescribeTableCommand(describeTableParams)
+    );
+    console.log(
+      "Table description:",
+      JSON.stringify(tableDescription, null, 2)
+    );
+
+    // Check if the index is active
+    const indexInfo = tableDescription.Table.GlobalSecondaryIndexes.find(
+      (index) => index.IndexName === "conversationId-index"
+    );
+    if (!indexInfo || indexInfo.IndexStatus !== "ACTIVE") {
+      throw new Error(
+        "Index conversationId-index is not active or does not exist"
+      );
     }
 
     // Query to get the userId based on the conversationId
