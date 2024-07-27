@@ -3,7 +3,6 @@ const {
   DynamoDBClient,
   GetItemCommand,
   QueryCommand,
-  ScanCommand,
   DescribeTableCommand,
 } = require("@aws-sdk/client-dynamodb");
 const {
@@ -21,15 +20,12 @@ const apiGatewayClient = new ApiGatewayManagementApiClient({
 });
 
 exports.handler = async (event) => {
-  console.log("Received event:", JSON.stringify(event, null, 2));
-
   let conversationId, responseText, messageType, body, userId;
   try {
     body = JSON.parse(event.body);
     messageType = body.type;
     conversationId = body.conversationId;
     responseText = body.payload.text;
-    console.log("Parsed request body:", body);
 
     if (messageType === "test") {
       return {
@@ -38,19 +34,11 @@ exports.handler = async (event) => {
       };
     }
 
-    // Describe the table to check the status of the index
-    const describeTableParams = {
-      TableName,
-    };
+    const describeTableParams = { TableName };
     const tableDescription = await dynamoDbClient.send(
       new DescribeTableCommand(describeTableParams)
     );
-    console.log(
-      "Table description:",
-      JSON.stringify(tableDescription, null, 2)
-    );
 
-    // Check if the index is active
     const indexInfo = tableDescription.Table.GlobalSecondaryIndexes.find(
       (index) => index.IndexName === "conversationId-index"
     );
@@ -60,7 +48,6 @@ exports.handler = async (event) => {
       );
     }
 
-    // Query to get the userId based on the conversationId
     const queryParams = {
       TableName,
       IndexName: "conversationId-index",
@@ -70,25 +57,11 @@ exports.handler = async (event) => {
       },
     };
 
-    console.log("Query params:", JSON.stringify(queryParams, null, 2));
-
     const queryResult = await dynamoDbClient.send(
       new QueryCommand(queryParams)
     );
 
-    console.log("Query result:", JSON.stringify(queryResult, null, 2));
-
     if (!queryResult.Items || queryResult.Items.length === 0) {
-      console.error("User ID not found for conversationId:", conversationId);
-
-      // Perform a scan operation for debugging
-      console.log("Performing scan operation for debugging...");
-      const scanParams = {
-        TableName,
-      };
-      const scanResult = await dynamoDbClient.send(new ScanCommand(scanParams));
-      console.log("Scan result:", JSON.stringify(scanResult, null, 2));
-
       return {
         statusCode: 404,
         body: JSON.stringify({
@@ -98,12 +71,7 @@ exports.handler = async (event) => {
     }
 
     userId = queryResult.Items[0].PK.S.split("#")[1];
-    console.log("User ID found:", userId);
   } catch (parseError) {
-    console.error(
-      "Error parsing request body or fetching user ID:",
-      parseError
-    );
     return {
       statusCode: 400,
       body: JSON.stringify({
@@ -115,7 +83,6 @@ exports.handler = async (event) => {
   try {
     let dataToSend;
 
-    // Fetch user settings from DynamoDB
     const getUserParams = {
       TableName,
       Key: {
@@ -130,7 +97,6 @@ exports.handler = async (event) => {
     const userSettings = getUserResult.Item;
 
     if (!userSettings) {
-      console.error("User settings not found for userId:", userId);
       return {
         statusCode: 404,
         body: JSON.stringify({ message: "User settings not found" }),
@@ -139,29 +105,17 @@ exports.handler = async (event) => {
     const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
 
     if (messageType === "text" && !anonymizationSetting) {
-      // Call the De-anonymize Service
-      console.log(
-        "Sending request to de-anonymize endpoint:",
-        DEANONYMIZE_ENDPOINT
-      );
       const deanonymizeResponse = await axios.post(DEANONYMIZE_ENDPOINT, {
         anonymizedText: responseText,
         conversationId: conversationId,
       });
 
       if (deanonymizeResponse.status !== 200) {
-        console.error(
-          "Failed to get response from de-anonymize endpoint:",
-          deanonymizeResponse.status,
-          deanonymizeResponse.statusText,
-          deanonymizeResponse.data
-        );
         throw new Error(
           `Failed to get response from de-anonymize endpoint: ${deanonymizeResponse.statusText}`
         );
       }
 
-      console.log("De-anonymize response received:", deanonymizeResponse.data);
       const { deanonymizedText } = deanonymizeResponse.data;
       dataToSend = { text: deanonymizedText };
     } else if (messageType === "choice") {
@@ -174,7 +128,6 @@ exports.handler = async (event) => {
       dataToSend = { text: responseText };
     }
 
-    // Retrieve the connectionId from the DynamoDB table using the conversationId
     const params = {
       TableName,
       Key: {
@@ -183,22 +136,13 @@ exports.handler = async (event) => {
       },
     };
 
-    console.log("Getting item from DynamoDB:", JSON.stringify(params, null, 2));
     const result = await dynamoDbClient.send(new GetItemCommand(params));
-
-    console.log(
-      "Result gotten from DynamoDB:",
-      JSON.stringify(result, null, 2)
-    );
 
     if (!result.Item || !result.Item.connectionId) {
       throw new Error("Connection ID not found for the given conversation ID");
     }
 
     const connectionId = result.Item.connectionId.S;
-    console.log("Connection ID retrieved:", connectionId);
-
-    console.log("WebSocket callback URL:", callbackUrl);
 
     const postParams = {
       ConnectionId: connectionId,
@@ -208,13 +152,11 @@ exports.handler = async (event) => {
     const command = new PostToConnectionCommand(postParams);
     await apiGatewayClient.send(command);
 
-    console.log("Successfully forwarded message");
     return {
       statusCode: 200,
       body: JSON.stringify({ message: "Message forwarded successfully" }),
     };
   } catch (error) {
-    console.error("Error processing message:", error);
     return {
       statusCode: error.response ? error.response.status : 500,
       body: JSON.stringify({ message: error.message }),
