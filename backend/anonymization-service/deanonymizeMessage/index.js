@@ -36,7 +36,7 @@ exports.handler = async (event) => {
     TableName,
     Key: {
       PK: { S: `userID#${userId}` },
-      SK: { S: `userID#${userID}` },
+      SK: { S: `userID#${userId}` },
     },
   };
 
