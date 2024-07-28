@@ -30,12 +30,20 @@ exports.handler = async (event) => {
     ({ userId, conversationId, message, anonymizationSetting } = requestBody);
     console.log("Parsed request body:", requestBody);
 
-    if (!userId || !conversationId || !message || !anonymizationSetting) {
-      console.error("Missing userId, conversationId, or message");
+    if (
+      !userId ||
+      !conversationId ||
+      !message ||
+      anonymizationSetting === undefined
+    ) {
+      console.error(
+        "Missing userId, conversationId, message, or anonymizationSetting"
+      );
       return {
         statusCode: 400,
         body: JSON.stringify({
-          error: "userId, conversationId, and message are required",
+          error:
+            "userId, conversationId, message, and anonymizationSetting are required",
         }),
       };
     }
@@ -68,15 +76,14 @@ exports.handler = async (event) => {
 
     console.log("LLM response received:", llmResponse.data);
 
-    const llmMessage = llmResponse.data;
+    const parsedMessage = llmResponse.data;
 
-    if (!llmMessage) {
+    if (!parsedMessage) {
       throw new Error("No message received from LLM");
     }
 
-    console.log("Sanitized LLM message:", llmMessage);
+    console.log("Sanitized LLM message:", parsedMessage);
 
-    const parsedMessage = JSON.parse(llmMessage);
     const { processed_text, private_data } = parsedMessage;
 
     console.log("Private data:", private_data);
@@ -110,7 +117,7 @@ exports.handler = async (event) => {
     }
 
     if (!anonymizationSetting) {
-      let dataToSend = processed_text;
+      let dataToSend = finalText;
 
       const params = {
         TableName,
