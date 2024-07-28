@@ -68,7 +68,7 @@ exports.handler = async (event) => {
 
     console.log("LLM response received:", llmResponse.data);
 
-    const { message: llmMessage } = llmResponse.data;
+    const llmMessage = llmResponse.data;
 
     if (!llmMessage) {
       throw new Error("No message received from LLM");
