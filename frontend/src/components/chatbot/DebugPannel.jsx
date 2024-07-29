@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/chatbot/Spinner";
+import Spinner from "@/components/chatbot/Spinner";
 
 function DebugPannel({
   conversationId,
@@ -12,36 +12,9 @@ function DebugPannel({
   isChatbotMemory,
   setIsChatbotMemory,
   sendMessage,
+  isSending,
   setIsSending,
 }) {
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const response = await fetch(
-          `YOUR_BACKEND_API_ENDPOINT?userId=${userId}`,
-          {
-            method: "GET",
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch settings");
-        }
-
-        const data = await response.json();
-        setIsDataVisible(data.anonymizationSetting);
-        setIsChatbotMemory(data.memorySetting);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching settings:", error);
-      }
-    };
-
-    fetchSettings();
-  }, [userId, setIsDataVisible, setIsChatbotMemory]);
-
   const toggleDataVisibility = async () => {
     const newVisibility = !isDataVisible;
     setIsDataVisible(newVisibility);
@@ -76,10 +49,6 @@ function DebugPannel({
     setIsSending(false);
   };
 
-  if (loading) {
-    return <Spinner />;
-  }
-
   return (
     <div className="bg-gray-50 shadow-md rounded-lg p-6 max-w-lg m-4">
       <p className="text-gray-700">
@@ -95,28 +64,20 @@ function DebugPannel({
       <p className="text-gray-700">
         <span className="font-medium">Timed Out:</span> {isTimedOut.toString()}
       </p>
-      <p className="text-gray-700">
-        <span className="font-medium">Data Visible: </span>{" "}
-        {isDataVisible.toString()}
-      </p>
-      <p className="text-gray-700">
-        <span className="font-medium">Chatbot Memory: </span>{" "}
-        {isChatbotMemory.toString()}
-      </p>
       <Button
         className="m-2 t-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
         onClick={toggleDataVisibility}
-        disabled={setIsSending}
+        disabled={isSending}
       >
-        {setIsSending ? <Spinner /> : "Data Visibility Toggle"}
+        {isSending ? <Spinner /> : "Data Visibility Toggle"}
       </Button>
 
       <Button
         className="m-2 mt-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
         onClick={toggleChatbotMemory}
-        disabled={setIsSending}
+        disabled={isSending}
       >
-        {setIsSending ? <Spinner /> : "Chatbot Memory Toggle"}
+        {isSending ? <Spinner /> : "Chatbot Memory Toggle"}
       </Button>
     </div>
   );
