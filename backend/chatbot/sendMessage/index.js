@@ -125,7 +125,7 @@ exports.handler = async (event) => {
         messageId,
         conversationId,
         type,
-        text: finalText,
+        text: formattedMessage,
         payload,
       },
       { headers: { Authorization: `Bearer ${BOTPRESS_TOKEN}` } }
