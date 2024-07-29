@@ -60,6 +60,7 @@ function ChatbotPage() {
         isChatbotMemory={isChatbotMemory}
         setIsChatbotMemory={setIsChatbotMemory}
         sendMessage={sendMessage}
+        setIsSending={setIsSending}
       />
       {isChatbotOpen ? (
         <Chatbot

@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/chatbot/Spinner";
 
 function DebugPannel({
   conversationId,
@@ -11,28 +12,73 @@ function DebugPannel({
   isChatbotMemory,
   setIsChatbotMemory,
   sendMessage,
+  setIsSending,
 }) {
-  const toggleDataVisibility = () => {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch(
+          `YOUR_BACKEND_API_ENDPOINT?userId=${userId}`,
+          {
+            method: "GET",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch settings");
+        }
+
+        const data = await response.json();
+        setIsDataVisible(data.anonymizationSetting);
+        setIsChatbotMemory(data.memorySetting);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+      }
+    };
+
+    fetchSettings();
+  }, [userId, setIsDataVisible, setIsChatbotMemory]);
+
+  const toggleDataVisibility = async () => {
     const newVisibility = !isDataVisible;
     setIsDataVisible(newVisibility);
-    sendMessage({
-      action: "userSettings",
-      userId,
-      memorySetting: isChatbotMemory,
-      anonymizationSetting: newVisibility,
-    });
+    setIsSending(true);
+    try {
+      await sendMessage({
+        action: "userSettings",
+        userId,
+        memorySetting: isChatbotMemory,
+        anonymizationSetting: newVisibility,
+      });
+    } catch (error) {
+      console.error("Error updating settings:", error);
+    }
+    setIsSending(false);
   };
 
-  const toggleChatbotMemory = () => {
+  const toggleChatbotMemory = async () => {
     const newMemory = !isChatbotMemory;
     setIsChatbotMemory(newMemory);
-    sendMessage({
-      action: "userSettings",
-      userId,
-      memorySetting: newMemory,
-      anonymizationSetting: isDataVisible,
-    });
+    setIsSending(true);
+    try {
+      await sendMessage({
+        action: "userSettings",
+        userId,
+        memorySetting: newMemory,
+        anonymizationSetting: isDataVisible,
+      });
+    } catch (error) {
+      console.error("Error updating settings:", error);
+    }
+    setIsSending(false);
   };
+
+  if (loading) {
+    return <Spinner />;
+  }
 
   return (
     <div className="bg-gray-50 shadow-md rounded-lg p-6 max-w-lg m-4">
@@ -60,15 +106,17 @@ function DebugPannel({
       <Button
         className="m-2 t-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
         onClick={toggleDataVisibility}
+        disabled={setIsSending}
       >
-        Data Visibility Toggle
+        {setIsSending ? <Spinner /> : "Data Visibility Toggle"}
       </Button>
 
       <Button
         className="m-2 mt-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
         onClick={toggleChatbotMemory}
+        disabled={setIsSending}
       >
-        Chatbot Memory Toggle
+        {setIsSending ? <Spinner /> : "Chatbot Memory Toggle"}
       </Button>
     </div>
   );
