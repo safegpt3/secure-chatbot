@@ -33,7 +33,9 @@ exports.handler = async (event) => {
   }
 
   try {
-    let finalText = text;
+    let currentMessage = text;
+    let previousConversationsText = "";
+    let formattedMessage = "";
 
     // Fetch user settings from DynamoDB
     const getUserParams = {
@@ -70,11 +72,13 @@ exports.handler = async (event) => {
       });
       console.log("Anonymize response received:", anonymizeResponse.data);
 
-      finalText = anonymizeResponse.data.anonymizedText;
+      currentMessage = anonymizeResponse.data.anonymizedText;
     }
 
-    // Append previous conversations
+    // Construct message to send
     if (memorySetting) {
+      previousConversationsText = "Previous conversations:\n";
+
       const queryParams = {
         TableName,
         KeyConditionExpression:
@@ -89,19 +93,28 @@ exports.handler = async (event) => {
         new QueryCommand(queryParams)
       );
 
-      const previousConversations = queryResult.Items || [];
-      let previousMessages = "";
+      console.log("queryResult.Items: ", queryResult.Items);
 
-      previousConversations.forEach((item) => {
-        if (item.messages && item.messages.L) {
-          const conversationMessages = item.messages.L.map(
-            (message) => message.M.text.S
-          ).join("\n");
-          previousMessages += conversationMessages + "\n---\n";
+      const previousConversations = queryResult.Items || [];
+
+      previousConversations.forEach((item, index) => {
+        if (
+          item.SK.S !== `conversationID#${conversationId}` &&
+          item.messages &&
+          item.messages.L
+        ) {
+          previousConversationsText += `Conversation ${index + 1}:\n`;
+
+          const conversationMessages = item.messages.L.map((message) => {
+            const sender = message.M.type.S === "user" ? "User" : "Bot";
+            return `${sender}: ${message.M.text.S}`;
+          }).join("\n");
+          previousConversationsText += conversationMessages + "\n---\n";
         }
       });
 
-      finalText = previousMessages + `User: ${finalText}`;
+      formattedMessage +=
+        previousConversationsText + `Current message: User: ${currentMessage}`;
     }
 
     console.log("Sending message to Botpress endpoint:", BOTPRESS_ENDPOINT);
