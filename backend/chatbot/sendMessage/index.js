@@ -2,6 +2,7 @@ const axios = require("axios");
 const {
   DynamoDBClient,
   GetItemCommand,
+  QueryCommand,
   UpdateItemCommand,
 } = require("@aws-sdk/client-dynamodb");
 
@@ -72,6 +73,37 @@ exports.handler = async (event) => {
       finalText = anonymizeResponse.data.anonymizedText;
     }
 
+    // Append previous conversations
+    if (memorySetting) {
+      const queryParams = {
+        TableName,
+        KeyConditionExpression:
+          "PK = :userId AND begins_with(SK, :conversationIdPrefix)",
+        ExpressionAttributeValues: {
+          ":userId": { S: `userID#${userId}` },
+          ":conversationIdPrefix": { S: "conversationID#" },
+        },
+      };
+
+      const queryResult = await dynamoDbClient.send(
+        new QueryCommand(queryParams)
+      );
+
+      const previousConversations = queryResult.Items || [];
+      let previousMessages = "";
+
+      previousConversations.forEach((item) => {
+        if (item.messages && item.messages.L) {
+          const conversationMessages = item.messages.L.map(
+            (message) => message.M.text.S
+          ).join("\n");
+          previousMessages += conversationMessages + "\n---\n";
+        }
+      });
+
+      finalText = previousMessages + `User: ${finalText}`;
+    }
+
     console.log("Sending message to Botpress endpoint:", BOTPRESS_ENDPOINT);
     const botResponse = await axios.post(
       BOTPRESS_ENDPOINT,
@@ -114,7 +146,7 @@ exports.handler = async (event) => {
         },
       };
 
-      await dynamoDbClient.send(new UpdateItemCommand(updateParams)); // Use UpdateItemCommand here
+      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
       console.log("Message saved to DynamoDB");
     }
 
