@@ -143,7 +143,7 @@ exports.handler = async (event) => {
     }
 
     if (!anonymizationSetting) {
-      let dataToSend = { message: finalText, sender: "user" };
+      let dataToSend = { text: finalText, sender: "user" };
 
       const params = {
         TableName,

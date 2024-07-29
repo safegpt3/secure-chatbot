@@ -37,8 +37,8 @@ const useConversation = (
       if (updatedConversation.length > 0) {
         updatedConversation[updatedConversation.length - 1] = {
           text: messageData.text,
-          role: messageData.role || "bot",
-          type: messageData.type,
+          role: messageData.role || "user",
+          type: "text",
           options: messageData.options || [],
         };
       }
