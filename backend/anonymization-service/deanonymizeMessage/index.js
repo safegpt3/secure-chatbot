@@ -66,20 +66,16 @@ exports.handler = async (event) => {
       };
     }
 
-    const privateData = {};
-    for (const key in piiMap) {
-      privateData[key] = piiMap[key].S;
-    }
-    console.log("Private data retrieved:", privateData);
-
     let deanonymizedResponse = anonymizedText;
     console.log("Initial anonymized text:", deanonymizedResponse);
 
-    for (const [placeholder, originalValue] of Object.entries(privateData)) {
-      const regex = new RegExp(`<${placeholder.toUpperCase()}>`, "g");
-      deanonymizedResponse = deanonymizedResponse.replace(regex, originalValue);
+    for (const [placeholder, originalValue] of Object.entries(piiMap)) {
+      deanonymizedResponse = deanonymizedResponse.replace(
+        new RegExp(`<${placeholder.toUpperCase()}>`, "g"),
+        originalValue.S
+      );
       console.log(
-        `Replaced <${placeholder.toUpperCase()}> with ${originalValue}`
+        `Replaced <${placeholder.toUpperCase()}> with ${originalValue.S}`
       );
     }
 
@@ -98,5 +94,3 @@ exports.handler = async (event) => {
     };
   }
 };
-
-//Test
