@@ -55,38 +55,21 @@ exports.handler = async (event) => {
       };
     }
 
-    // Ensure the PII attribute is a valid JSON string
-    if (!getItemResult.Item.PII.S) {
-      console.error(
-        "PII attribute is not a valid JSON string:",
-        getItemResult.Item.PII
-      );
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "PII attribute is not valid JSON" }),
-      };
-    }
+    const piiMap = getItemResult.Item.PII.M;
 
-    // Parse private data
-    let privateData;
-    try {
-      privateData = JSON.parse(getItemResult.Item.PII.S);
-      console.log("Private data retrieved:", privateData);
-    } catch (jsonParseError) {
-      console.error("Error parsing PII attribute as JSON:", jsonParseError);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: "Error parsing PII attribute as JSON" }),
-      };
-    }
-
-    if (!privateData || Object.keys(privateData).length === 0) {
+    if (Object.keys(piiMap).length === 0) {
       console.log("PII attribute is empty");
       return {
         statusCode: 200,
         body: JSON.stringify({ deanonymizedText: anonymizedText }),
       };
     }
+
+    const privateData = {};
+    for (const key in piiMap) {
+      privateData[key] = piiMap[key].S;
+    }
+    console.log("Private data retrieved:", privateData);
 
     let deanonymizedResponse = anonymizedText;
 
