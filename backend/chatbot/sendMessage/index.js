@@ -150,7 +150,7 @@ exports.handler = async (event) => {
                 M: {
                   messageId: { S: `msg-${new Date().getTime()}` },
                   type: { S: "user" },
-                  text: { S: finalText },
+                  text: { S: currentMessage },
                   timestamp: { S: new Date().toISOString() },
                 },
               },
@@ -187,5 +187,3 @@ exports.handler = async (event) => {
     };
   }
 };
-
-//Test 2
