@@ -27,6 +27,7 @@ function ChatbotPage() {
   const [isSending, setIsSending] = useState(false);
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [isDataVisible, setIsDataVisible] = useState(true);
+  const [isChatbotMemory, setIsChatbotMemory] = useState(true);
 
   useAuth(setUserId);
 
@@ -56,6 +57,9 @@ function ChatbotPage() {
         isTimedOut={isTimedOut}
         isDataVisible={isDataVisible}
         setIsDataVisible={setIsDataVisible}
+        isChatbotMemory={isChatbotMemory}
+        setIsChatbotMemory={setIsChatbotMemory}
+        sendMessage={sendMessage}
       />
       {isChatbotOpen ? (
         <Chatbot

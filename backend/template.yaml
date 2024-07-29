@@ -311,6 +311,13 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /userSettings
             Method: ANY
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action:
+              - dynamodb:UpdateItem
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   UserSettingsPermission:
     Type: AWS::Lambda::Permission

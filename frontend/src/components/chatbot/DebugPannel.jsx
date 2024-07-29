@@ -8,9 +8,30 @@ function DebugPannel({
   isTimedOut,
   isDataVisible,
   setIsDataVisible,
+  isChatbotMemory,
+  setIsChatbotMemory,
+  sendMessage,
 }) {
   const toggleDataVisibility = () => {
-    setIsDataVisible(!isDataVisible);
+    const newVisibility = !isDataVisible;
+    setIsDataVisible(newVisibility);
+    sendMessage({
+      action: "userSettings",
+      userId,
+      memorySetting: isChatbotMemory,
+      anonymizationSetting: newVisibility,
+    });
+  };
+
+  const toggleChatbotMemory = () => {
+    const newMemory = !isChatbotMemory;
+    setIsChatbotMemory(newMemory);
+    sendMessage({
+      action: "userSettings",
+      userId,
+      memorySetting: newMemory,
+      anonymizationSetting: isDataVisible,
+    });
   };
 
   return (
@@ -32,11 +53,22 @@ function DebugPannel({
         <span className="font-medium">Data Visible: </span>{" "}
         {isDataVisible.toString()}
       </p>
+      <p className="text-gray-700">
+        <span className="font-medium">Chatbot Memory: </span>{" "}
+        {isChatbotMemory.toString()}
+      </p>
       <Button
-        className="mt-8 bg-black text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
+        className="m-2 t-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
         onClick={toggleDataVisibility}
       >
         Data Visibility Toggle
+      </Button>
+
+      <Button
+        className="m-2 mt-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
+        onClick={toggleChatbotMemory}
+      >
+        Chatbot Memory Toggle
       </Button>
     </div>
   );

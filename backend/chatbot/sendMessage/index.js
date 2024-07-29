@@ -103,7 +103,7 @@ exports.handler = async (event) => {
           item.messages &&
           item.messages.L
         ) {
-          previousConversationsText += `Conversation ${index + 1}:\n`;
+          previousConversationsText += `Conversation ${index}:\n`;
 
           const conversationMessages = item.messages.L.map((message) => {
             const sender = message.M.type.S === "user" ? "User" : "Bot";
