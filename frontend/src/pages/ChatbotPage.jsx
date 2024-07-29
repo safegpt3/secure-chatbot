@@ -31,12 +31,13 @@ function ChatbotPage() {
 
   useAuth(setUserId);
 
-  const { handleNewMessage, resetConversation } = useConversation(
-    conversationId,
-    setConversationId,
-    conversation,
-    setConversation
-  );
+  const { handleNewMessage, updateLastMessage, resetConversation } =
+    useConversation(
+      conversationId,
+      setConversationId,
+      conversation,
+      setConversation
+    );
 
   const { openConnection, sendMessage } = useWebSocket(
     wsRef,
@@ -45,6 +46,7 @@ function ChatbotPage() {
     setIsTimedOut,
     conversationId,
     handleNewMessage,
+    updateLastMessage,
     userId
   );
 

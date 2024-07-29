@@ -171,6 +171,7 @@ exports.handler = async (event) => {
 
       const postParams = {
         ConnectionId: connectionId,
+        type: "user",
         Data: JSON.stringify(dataToSend),
       };
 

@@ -182,6 +182,7 @@ exports.handler = async (event) => {
     console.log("Sending message to connection ID via WebSocket");
     const postParams = {
       ConnectionId: connectionId,
+      type: "bot",
       Data: JSON.stringify(dataToSend),
     };
 

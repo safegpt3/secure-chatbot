@@ -369,6 +369,12 @@ Resources:
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}/index/conversationId-index"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - execute-api:Invoke
+                - execute-api:ManageConnections
+              Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/production/POST/@connections/*"
 
   DeanonymizeMessageFunction:
     Type: AWS::Serverless::Function

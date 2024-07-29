@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import CloseChatbotButton from "@/components/chatbot/CloseChatbotButton";
 import RefreshChatbotButton from "@/components/chatbot/RefreshChatbotButton";
 import ChoiceOptions from "@/components/chatbot/ChoiceOptions";
+import Spinner from "./Spinner";
 
 function Chatbot({
   userId,
@@ -180,11 +181,7 @@ function Chatbot({
                   disabled={!isConnected || isSending}
                 />
                 <Button type="submit" disabled={!isConnected || isSending}>
-                  {isSending ? (
-                    <RefreshCw Ccw className="animate-spin" />
-                  ) : (
-                    "Send"
-                  )}
+                  {isSending ? <Spinner /> : "Send"}
                 </Button>
               </form>
             </div>
