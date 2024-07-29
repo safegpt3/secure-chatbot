@@ -143,7 +143,7 @@ exports.handler = async (event) => {
     }
 
     if (!anonymizationSetting) {
-      let dataToSend = finalText;
+      let dataToSend = { message: finalText, sender: "user" };
 
       const params = {
         TableName,
@@ -171,7 +171,6 @@ exports.handler = async (event) => {
 
       const postParams = {
         ConnectionId: connectionId,
-        type: "user",
         Data: JSON.stringify(dataToSend),
       };
 

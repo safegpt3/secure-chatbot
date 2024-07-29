@@ -148,15 +148,16 @@ exports.handler = async (event) => {
 
       console.log("De-anonymize response received:", deanonymizeResponse.data);
       const { deanonymizedText } = deanonymizeResponse.data;
-      dataToSend = { text: deanonymizedText };
+      dataToSend = { text: deanonymizedText, sender: "bot" };
     } else if (messageType === "choice") {
       dataToSend = {
         type: messageType,
         text: responseText,
         options: body.payload.options,
+        sender: "bot",
       };
     } else {
-      dataToSend = { text: responseText };
+      dataToSend = { text: responseText, sender: "bot" };
     }
 
     console.log("Getting connection ID from DynamoDB");
@@ -182,7 +183,6 @@ exports.handler = async (event) => {
     console.log("Sending message to connection ID via WebSocket");
     const postParams = {
       ConnectionId: connectionId,
-      type: "bot",
       Data: JSON.stringify(dataToSend),
     };
 

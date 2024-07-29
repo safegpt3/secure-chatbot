@@ -45,7 +45,7 @@ const useWebSocket = (
 
       wsRef.current.onmessage = (event) => {
         recieveMessage(event);
-        console.log("onmessage - message received:", event.data);
+        console.log("onmessage - message received:", event);
       };
 
       wsRef.current.onerror = (error) => {
@@ -76,9 +76,9 @@ const useWebSocket = (
   const recieveMessage = (event) => {
     const messageData = JSON.parse(event.data);
 
-    if (messageData.type === "user") {
+    if (messageData.sender === "user") {
       updateLastMessage(messageData);
-    } else if (messageData.type === "bot") {
+    } else if (messageData.sender === "bot") {
       handleNewMessage(messageData);
       setIsSending(false);
     }
