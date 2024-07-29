@@ -55,15 +55,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Check if PII attribute is an empty map
-    if (Object.keys(getItemResult.Item.PII.M).length === 0) {
-      console.log("PII attribute is an empty map");
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ deanonymizedText: anonymizedText }),
-      };
-    }
-
     // Ensure the PII attribute is a valid JSON string
     if (!getItemResult.Item.PII.S) {
       console.error(
