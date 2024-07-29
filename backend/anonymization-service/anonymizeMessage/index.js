@@ -104,7 +104,7 @@ exports.handler = async (event) => {
       Object.entries(private_data).forEach(([key, value], index) => {
         const placeholder = `#key${index}`;
         const valuePlaceholder = `:value${index}`;
-        updateExpressions.push(`${placeholder} = ${valuePlaceholder}`);
+        updateExpressions.push(`PII.${placeholder} = ${valuePlaceholder}`);
         expressionAttributeNames[placeholder] = key;
         expressionAttributeValues[valuePlaceholder] = { S: value };
       });
