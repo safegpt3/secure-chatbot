@@ -80,6 +80,14 @@ exports.handler = async (event) => {
       };
     }
 
+    if (!privateData || Object.keys(privateData).length === 0) {
+      console.log("PII attribute is empty");
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ deanonymizedText: anonymizedText }),
+      };
+    }
+
     let deanonymizedResponse = anonymizedText;
 
     for (const [placeholder, originalValue] of Object.entries(privateData)) {
