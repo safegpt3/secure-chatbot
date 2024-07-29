@@ -56,6 +56,7 @@ exports.handler = async (event) => {
     }
 
     const piiMap = getItemResult.Item.PII.M;
+    console.log("PII map retrieved from DynamoDB:", piiMap);
 
     if (Object.keys(piiMap).length === 0) {
       console.log("PII attribute is empty");
@@ -72,10 +73,14 @@ exports.handler = async (event) => {
     console.log("Private data retrieved:", privateData);
 
     let deanonymizedResponse = anonymizedText;
+    console.log("Initial anonymized text:", deanonymizedResponse);
 
     for (const [placeholder, originalValue] of Object.entries(privateData)) {
       const regex = new RegExp(`<${placeholder.toUpperCase()}>`, "g");
       deanonymizedResponse = deanonymizedResponse.replace(regex, originalValue);
+      console.log(
+        `Replaced <${placeholder.toUpperCase()}> with ${originalValue}`
+      );
     }
 
     console.log("Deanonymized response:", deanonymizedResponse);
