@@ -7,6 +7,7 @@ const useWebSocket = (
   setIsTimedOut,
   conversationId,
   handleNewMessage,
+  updateLastMessage,
   userId
 ) => {
   const constructWsUrl = (baseUrl, conversationId, userId) => {
@@ -44,7 +45,7 @@ const useWebSocket = (
 
       wsRef.current.onmessage = (event) => {
         recieveMessage(event);
-        console.log("onmessage - message received:", event.data);
+        console.log("onmessage - message received:", event);
       };
 
       wsRef.current.onerror = (error) => {
@@ -74,8 +75,13 @@ const useWebSocket = (
 
   const recieveMessage = (event) => {
     const messageData = JSON.parse(event.data);
-    handleNewMessage(messageData);
-    setIsSending(false);
+
+    if (messageData.sender === "user") {
+      updateLastMessage(messageData);
+    } else if (messageData.sender === "bot") {
+      handleNewMessage(messageData);
+      setIsSending(false);
+    }
   };
 
   useEffect(() => {

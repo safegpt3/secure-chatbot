@@ -36,7 +36,7 @@ exports.handler = async (event) => {
     TableName,
     Key: {
       PK: { S: `userID#${userId}` },
-      SK: { S: `conversationID#${conversationId}` },
+      SK: { S: `userID#${userId}` },
     },
   };
 
@@ -45,6 +45,7 @@ exports.handler = async (event) => {
     const getItemResult = await dynamoDbClient.send(
       new GetItemCommand(getItemParams)
     );
+    console.log("GetItem result:", JSON.stringify(getItemResult, null, 2));
 
     if (!getItemResult.Item || !getItemResult.Item.PII) {
       console.log("No sensitive data found for the provided conversationId");
@@ -54,15 +55,28 @@ exports.handler = async (event) => {
       };
     }
 
-    // Parse private data
-    const privateData = JSON.parse(getItemResult.Item.PII.S);
-    console.log("Private data retrieved:", privateData);
+    const piiMap = getItemResult.Item.PII.M;
+    console.log("PII map retrieved from DynamoDB:", piiMap);
+
+    if (Object.keys(piiMap).length === 0) {
+      console.log("PII attribute is empty");
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ deanonymizedText: anonymizedText }),
+      };
+    }
 
     let deanonymizedResponse = anonymizedText;
+    console.log("Initial anonymized text:", deanonymizedResponse);
 
-    for (const [placeholder, originalValue] of Object.entries(privateData)) {
-      const regex = new RegExp(`<${placeholder.toUpperCase()}>`, "g");
-      deanonymizedResponse = deanonymizedResponse.replace(regex, originalValue);
+    for (const [placeholder, originalValue] of Object.entries(piiMap)) {
+      deanonymizedResponse = deanonymizedResponse.replace(
+        new RegExp(`<${placeholder.toUpperCase()}>`, "g"),
+        originalValue.S
+      );
+      console.log(
+        `Replaced <${placeholder.toUpperCase()}> with ${originalValue.S}`
+      );
     }
 
     console.log("Deanonymized response:", deanonymizedResponse);

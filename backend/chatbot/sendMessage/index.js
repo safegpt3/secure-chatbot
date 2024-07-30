@@ -1,12 +1,17 @@
 const axios = require("axios");
-const { DynamoDBClient, GetItemCommand } = require("@aws-sdk/client-dynamodb");
+const {
+  DynamoDBClient,
+  GetItemCommand,
+  QueryCommand,
+  UpdateItemCommand,
+} = require("@aws-sdk/client-dynamodb");
 
 const ANONYMIZE_ENDPOINT = process.env.ANONYMIZE_ENDPOINT;
 const BOTPRESS_ENDPOINT = process.env.BOTPRESS_ENDPOINT;
 const BOTPRESS_TOKEN = process.env.BOTPRESS_TOKEN;
 const TableName = process.env.TABLE_NAME;
 
-const docClient = new DynamoDBClient();
+const dynamoDbClient = new DynamoDBClient();
 
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
@@ -28,7 +33,34 @@ exports.handler = async (event) => {
   }
 
   try {
-    let finalText = text;
+    let currentMessage = text;
+    let previousConversationsText = "";
+    let formattedMessage = "";
+
+    // Fetch user settings from DynamoDB
+    const getUserParams = {
+      TableName,
+      Key: {
+        PK: { S: `userID#${userId}` },
+        SK: { S: `userID#${userId}` },
+      },
+    };
+
+    const getUserResult = await dynamoDbClient.send(
+      new GetItemCommand(getUserParams)
+    );
+    const userSettings = getUserResult.Item;
+
+    if (!userSettings) {
+      console.error("User settings not found for userId:", userId);
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ message: "User settings not found" }),
+      };
+    }
+
+    const memorySetting = userSettings.memorySetting.BOOL;
+    const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
 
     if (internalType === "text") {
       console.log("Sending message to anonymize endpoint:", ANONYMIZE_ENDPOINT);
@@ -36,10 +68,55 @@ exports.handler = async (event) => {
         userId,
         conversationId,
         message: text,
+        anonymizationSetting: anonymizationSetting,
       });
       console.log("Anonymize response received:", anonymizeResponse.data);
 
-      finalText = anonymizeResponse.data.anonymizedText;
+      currentMessage = anonymizeResponse.data.anonymizedText;
+    }
+
+    // Construct message to send
+    if (memorySetting) {
+      previousConversationsText = "Previous conversations:\n";
+
+      const queryParams = {
+        TableName,
+        KeyConditionExpression:
+          "PK = :userId AND begins_with(SK, :conversationIdPrefix)",
+        ExpressionAttributeValues: {
+          ":userId": { S: `userID#${userId}` },
+          ":conversationIdPrefix": { S: "conversationID#" },
+        },
+      };
+
+      const queryResult = await dynamoDbClient.send(
+        new QueryCommand(queryParams)
+      );
+
+      console.log("queryResult.Items: ", queryResult.Items);
+
+      const previousConversations = queryResult.Items || [];
+
+      previousConversations.forEach((item, index) => {
+        if (
+          item.SK.S !== `conversationID#${conversationId}` &&
+          item.messages &&
+          item.messages.L
+        ) {
+          previousConversationsText += `Conversation ${index}:\n`;
+
+          const conversationMessages = item.messages.L.map((message) => {
+            const sender = message.M.type.S === "user" ? "User" : "Bot";
+            return `${sender}: ${message.M.text.S}`;
+          }).join("\n");
+          previousConversationsText += conversationMessages + "\n---\n";
+        }
+      });
+
+      formattedMessage +=
+        previousConversationsText + `Current message: User: ${currentMessage}`;
+    } else {
+      formattedMessage += `Current message: User: ${currentMessage}`;
     }
 
     console.log("Sending message to Botpress endpoint:", BOTPRESS_ENDPOINT);
@@ -50,12 +127,43 @@ exports.handler = async (event) => {
         messageId,
         conversationId,
         type,
-        text: finalText,
+        text: formattedMessage,
         payload,
       },
       { headers: { Authorization: `Bearer ${BOTPRESS_TOKEN}` } }
     );
     console.log("Botpress response received:", botResponse.data);
+
+    // Optionally save the message to DynamoDB based on memorySetting
+    if (memorySetting) {
+      const updateParams = {
+        TableName,
+        Key: {
+          PK: { S: `userID#${userId}` },
+          SK: { S: `conversationID#${conversationId}` },
+        },
+        UpdateExpression:
+          "SET messages = list_append(if_not_exists(messages, :empty_list), :msg)",
+        ExpressionAttributeValues: {
+          ":empty_list": { L: [] },
+          ":msg": {
+            L: [
+              {
+                M: {
+                  messageId: { S: `msg-${new Date().getTime()}` },
+                  type: { S: "user" },
+                  text: { S: currentMessage },
+                  timestamp: { S: new Date().toISOString() },
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
+      console.log("Message saved to DynamoDB");
+    }
 
     return {
       statusCode: 200,

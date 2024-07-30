@@ -20,13 +20,33 @@ const useConversation = (
 
     const newMessage = {
       text: messageData.text,
-      role: messageData.role || "assistant",
+      role: messageData.role || "bot",
       type: messageData.type,
       options: messageData.options || [],
     };
 
     setConversation((conversation) => [...conversation, newMessage]);
     console.log("New message added to conversation:", conversation);
+  };
+
+  const updateLastMessage = (messageData) => {
+    console.log("Updating last message: ", messageData);
+
+    setConversation((conversation) => {
+      const updatedConversation = [...conversation];
+      if (updatedConversation.length > 0) {
+        updatedConversation[updatedConversation.length - 1] = {
+          text: messageData.text,
+          role: messageData.role || "user",
+          type: "text",
+          options: messageData.options || [],
+        };
+      }
+
+      return updatedConversation;
+    });
+
+    console.log("Last message updated in conversation:", conversation);
   };
 
   const resetConversation = () => {
@@ -39,6 +59,7 @@ const useConversation = (
 
   return {
     handleNewMessage,
+    updateLastMessage,
     resetConversation,
   };
 };

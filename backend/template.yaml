@@ -274,6 +274,7 @@ Resources:
           ANONYMIZE_ENDPOINT: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/anonymize"
           BOTPRESS_TOKEN: !Ref BotpressToken
           BOTPRESS_ENDPOINT: !Ref BotpressEndpoint
+          TABLE_NAME: !Ref SecureChatbotTable
       Events:
         WebSocket:
           Type: Api
@@ -310,6 +311,14 @@ Resources:
             RestApiId: !Ref WebSocketApi
             Path: /userSettings
             Method: ANY
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action:
+              - dynamodb:UpdateItem
+              - dynamodb:GetItem
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
 
   UserSettingsPermission:
     Type: AWS::Lambda::Permission
@@ -360,6 +369,12 @@ Resources:
               Resource:
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}"
                 - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${SecureChatbotTable}/index/conversationId-index"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - execute-api:Invoke
+                - execute-api:ManageConnections
+              Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/production/POST/@connections/*"
 
   DeanonymizeMessageFunction:
     Type: AWS::Serverless::Function

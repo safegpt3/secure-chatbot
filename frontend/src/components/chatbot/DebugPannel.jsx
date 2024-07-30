@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import Spinner from "@/components/chatbot/Spinner";
 
 function DebugPannel({
   conversationId,
@@ -8,9 +9,44 @@ function DebugPannel({
   isTimedOut,
   isDataVisible,
   setIsDataVisible,
+  isChatbotMemory,
+  setIsChatbotMemory,
+  sendMessage,
+  isSending,
+  setIsSending,
 }) {
-  const toggleDataVisibility = () => {
-    setIsDataVisible(!isDataVisible);
+  const toggleDataVisibility = async () => {
+    const newVisibility = !isDataVisible;
+    setIsDataVisible(newVisibility);
+    setIsSending(true);
+    try {
+      await sendMessage({
+        action: "userSettings",
+        userId,
+        memorySetting: isChatbotMemory,
+        anonymizationSetting: newVisibility,
+      });
+    } catch (error) {
+      console.error("Error updating settings:", error);
+    }
+    setIsSending(false);
+  };
+
+  const toggleChatbotMemory = async () => {
+    const newMemory = !isChatbotMemory;
+    setIsChatbotMemory(newMemory);
+    setIsSending(true);
+    try {
+      await sendMessage({
+        action: "userSettings",
+        userId,
+        memorySetting: newMemory,
+        anonymizationSetting: isDataVisible,
+      });
+    } catch (error) {
+      console.error("Error updating settings:", error);
+    }
+    setIsSending(false);
   };
 
   return (
@@ -28,15 +64,20 @@ function DebugPannel({
       <p className="text-gray-700">
         <span className="font-medium">Timed Out:</span> {isTimedOut.toString()}
       </p>
-      <p className="text-gray-700">
-        <span className="font-medium">Data Visible: </span>{" "}
-        {isDataVisible.toString()}
-      </p>
       <Button
-        className="mt-8 bg-black text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
+        className="m-2 t-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
         onClick={toggleDataVisibility}
+        disabled={isSending}
       >
-        Data Visibility Toggle
+        {isSending ? <Spinner /> : "Data Visibility Toggle"}
+      </Button>
+
+      <Button
+        className="m-2 mt-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
+        onClick={toggleChatbotMemory}
+        disabled={isSending}
+      >
+        {isSending ? <Spinner /> : "Chatbot Memory Toggle"}
       </Button>
     </div>
   );

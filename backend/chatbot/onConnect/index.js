@@ -42,8 +42,8 @@ exports.handler = async (event) => {
           SK: { S: `userID#${userId}` },
           userId: { S: userId },
           PII: { M: {} },
-          memorySetting: { S: "" },
-          anonymizationSetting: { S: "" },
+          memorySetting: { BOOL: true },
+          anonymizationSetting: { BOOL: true },
         },
       };
       await docClient.send(new PutItemCommand(createUserParams));

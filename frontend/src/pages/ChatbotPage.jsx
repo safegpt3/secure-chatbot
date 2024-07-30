@@ -27,15 +27,17 @@ function ChatbotPage() {
   const [isSending, setIsSending] = useState(false);
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [isDataVisible, setIsDataVisible] = useState(true);
+  const [isChatbotMemory, setIsChatbotMemory] = useState(true);
 
   useAuth(setUserId);
 
-  const { handleNewMessage, resetConversation } = useConversation(
-    conversationId,
-    setConversationId,
-    conversation,
-    setConversation
-  );
+  const { handleNewMessage, updateLastMessage, resetConversation } =
+    useConversation(
+      conversationId,
+      setConversationId,
+      conversation,
+      setConversation
+    );
 
   const { openConnection, sendMessage } = useWebSocket(
     wsRef,
@@ -44,6 +46,7 @@ function ChatbotPage() {
     setIsTimedOut,
     conversationId,
     handleNewMessage,
+    updateLastMessage,
     userId
   );
 
@@ -56,6 +59,11 @@ function ChatbotPage() {
         isTimedOut={isTimedOut}
         isDataVisible={isDataVisible}
         setIsDataVisible={setIsDataVisible}
+        isChatbotMemory={isChatbotMemory}
+        setIsChatbotMemory={setIsChatbotMemory}
+        sendMessage={sendMessage}
+        isSending={isSending}
+        setIsSending={setIsSending}
       />
       {isChatbotOpen ? (
         <Chatbot

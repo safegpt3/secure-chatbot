@@ -24,23 +24,31 @@ const apiGatewayClient = new ApiGatewayManagementApiClient({
 exports.handler = async (event) => {
   console.log("Received event:", JSON.stringify(event, null, 2));
 
-  let conversationId, message, userId;
+  let conversationId, message, userId, anonymizationSetting;
   try {
     const requestBody = JSON.parse(event.body);
-    ({ userId, conversationId, message } = requestBody);
+    ({ userId, conversationId, message, anonymizationSetting } = requestBody);
     console.log("Parsed request body:", requestBody);
 
-    if (!userId || !conversationId || !message) {
-      console.error("Missing userId, conversationId, or message");
+    if (
+      !userId ||
+      !conversationId ||
+      !message ||
+      anonymizationSetting === undefined
+    ) {
+      console.error(
+        "Missing userId, conversationId, message, or anonymizationSetting"
+      );
       return {
         statusCode: 400,
         body: JSON.stringify({
-          error: "userId, conversationId, and message are required",
+          error:
+            "userId, conversationId, message, and anonymizationSetting are required",
         }),
       };
     }
   } catch (error) {
-    console.error("Error processing request:", error);
+    console.error("Error parsing request body:", error);
     return {
       statusCode: 400,
       body: JSON.stringify({
@@ -50,35 +58,11 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Fetch user settings from DynamoDB
-    const getUserParams = {
-      TableName,
-      Key: {
-        PK: { S: `userID#${userId}` },
-        SK: { S: `userID#${userId}` },
-      },
-    };
-
-    const getUserResult = await dynamoDbClient.send(
-      new GetItemCommand(getUserParams)
-    );
-    const userSettings = getUserResult.Item;
-
-    if (!userSettings) {
-      console.error("User settings not found for userId:", userId);
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ message: "User settings not found" }),
-      };
-    }
-
-    const memorySetting = userSettings.memorySetting.BOOL;
-    const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
-
     let finalText = message;
     console.log("Sending message to LLM endpoint:", LLM_LAMBDA_ENDPOINT);
     const llmResponse = await axios.post(LLM_LAMBDA_ENDPOINT, { message });
 
+    console.log("LLM response status:", llmResponse.status);
     if (llmResponse.status !== 200) {
       console.error(
         "Failed to get response from LLM:",
@@ -93,49 +77,73 @@ exports.handler = async (event) => {
 
     console.log("LLM response received:", llmResponse.data);
 
-    const { message: llmMessage } = llmResponse.data;
+    const parsedMessage = llmResponse.data;
 
-    if (!llmMessage) {
+    if (!parsedMessage) {
+      console.error("No message received from LLM");
       throw new Error("No message received from LLM");
     }
 
-    console.log("Sanitized LLM message:", llmMessage);
+    console.log("Sanitized LLM message:", parsedMessage);
 
-    const parsedMessage = JSON.parse(llmMessage);
     const { processed_text, private_data } = parsedMessage;
 
-    console.log("Private data:", private_data);
+    console.log("Private data received from LLM:", private_data);
     if (typeof private_data !== "object" || !private_data) {
+      console.error("Invalid private_data received from LLM");
       throw new Error("Invalid private_data received from LLM");
     }
 
     finalText = processed_text;
 
-    // Check if private_data is empty
     if (Object.keys(private_data).length > 0) {
+      const updateExpressions = [];
+      const expressionAttributeNames = {};
+      const expressionAttributeValues = {};
+
+      Object.entries(private_data).forEach(([key, value], index) => {
+        const placeholder = `#key${index}`;
+        const valuePlaceholder = `:value${index}`;
+        updateExpressions.push(`PII.${placeholder} = ${valuePlaceholder}`);
+        expressionAttributeNames[placeholder] = key;
+        expressionAttributeValues[valuePlaceholder] = { S: value };
+      });
+
+      const updateExpression = `SET ${updateExpressions.join(", ")}`;
+
+      console.log("UpdateExpression:", updateExpression);
+      console.log(
+        "ExpressionAttributeNames:",
+        JSON.stringify(expressionAttributeNames, null, 2)
+      );
+      console.log(
+        "ExpressionAttributeValues:",
+        JSON.stringify(expressionAttributeValues, null, 2)
+      );
+
       const params = {
         TableName,
         Key: {
           PK: { S: `userID#${userId}` },
-          SK: { S: `conversationID#${conversationId}` },
+          SK: { S: `userID#${userId}` },
         },
-        UpdateExpression: "set PIIData = :pd",
-        ExpressionAttributeValues: {
-          ":pd": { S: JSON.stringify(private_data) },
-        },
+        UpdateExpression: updateExpression,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
       };
 
       console.log(
-        "Updating item in DynamoDB:",
+        "Updating item in DynamoDB with params:",
         JSON.stringify(params, null, 2)
       );
       await dynamoDbClient.send(new UpdateItemCommand(params));
+      console.log("DynamoDB update successful");
     } else {
       console.log("No sensitive data found. Skipping DynamoDB update.");
     }
 
-    if (anonymizationSetting) {
-      let dataToSend = processed_text;
+    if (!anonymizationSetting) {
+      let dataToSend = { text: finalText, sender: "user" };
 
       const params = {
         TableName,
@@ -145,12 +153,12 @@ exports.handler = async (event) => {
         },
       };
 
-      console.log("Getting item from DynamoDB:", params);
+      console.log("Getting item from DynamoDB with params:", params);
       const result = await dynamoDbClient.send(new GetItemCommand(params));
-
-      console.log("Result gotten from DynamoDB:", result);
+      console.log("GetItem result from DynamoDB:", result);
 
       if (!result.Item || !result.Item.connectionId) {
+        console.error("Connection ID not found for the given conversation ID");
         throw new Error(
           "Connection ID not found for the given conversation ID"
         );
@@ -166,39 +174,10 @@ exports.handler = async (event) => {
         Data: JSON.stringify(dataToSend),
       };
 
+      console.log("Sending data to WebSocket with params:", postParams);
       const command = new PostToConnectionCommand(postParams);
       await apiGatewayClient.send(command);
-    }
-
-    // Optionally save the message to DynamoDB based on memorySetting
-    if (memorySetting) {
-      const updateParams = {
-        TableName,
-        Key: {
-          PK: { S: `userID#${userId}` },
-          SK: { S: `conversationID#${conversationId}` },
-        },
-        UpdateExpression:
-          "SET messages = list_append(if_not_exists(messages, :empty_list), :msg)",
-        ExpressionAttributeValues: {
-          ":empty_list": { L: [] },
-          ":msg": {
-            L: [
-              {
-                M: {
-                  messageId: { S: `msg-${new Date().getTime()}` },
-                  type: { S: "user" },
-                  text: { S: finalText },
-                  timestamp: { S: new Date().toISOString() },
-                },
-              },
-            ],
-          },
-        },
-      };
-
-      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
-      console.log("Message saved to DynamoDB");
+      console.log("Data successfully sent to WebSocket");
     }
 
     console.log("Successfully processed message");
@@ -208,7 +187,6 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error("Error processing message:", error);
-
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message }),
