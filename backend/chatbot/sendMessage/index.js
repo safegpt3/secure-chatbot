@@ -115,6 +115,8 @@ exports.handler = async (event) => {
 
       formattedMessage +=
         previousConversationsText + `Current message: User: ${currentMessage}`;
+    } else {
+      formattedMessage += `Current message: User: ${currentMessage}`;
     }
 
     console.log("Sending message to Botpress endpoint:", BOTPRESS_ENDPOINT);
