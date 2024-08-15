@@ -108,7 +108,7 @@ function Chatbot({
                 <AvatarImage src={assistantAvatar} />
               </Avatar>
               <div>
-                <CardTitle>Sano</CardTitle>
+                <CardTitle>SafeGPT</CardTitle>
                 <CardDescription>Virtual Assistant</CardDescription>
               </div>
             </div>
