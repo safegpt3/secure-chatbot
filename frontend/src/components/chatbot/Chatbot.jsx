@@ -101,7 +101,7 @@ function Chatbot({
   }
 
   useEffect(() => {
-    scrollToBottom(); // Scroll on initial load
+    scrollToBottom();
   }, []);
 
   useEffect(() => {
