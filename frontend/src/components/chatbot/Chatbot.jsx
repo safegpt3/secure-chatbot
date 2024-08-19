@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { RefreshCw } from "lucide-react";
 
 import userAvatar from "@/assets/user_profile_icon.png";
 import assistantAvatar from "@/assets/bot_profile_icon.png";
@@ -38,6 +37,7 @@ function Chatbot({
   setIsChatbotOpen,
 }) {
   const [input, setInput] = useState("");
+  const lastMessageRef = useRef();
 
   const handleInputChange = (event) => {
     setInput(event.target.value);
@@ -94,6 +94,20 @@ function Chatbot({
     console.log("Chatbot minimized.");
   };
 
+  function scrollToBottom() {
+    if (lastMessageRef.current) {
+      lastMessageRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }
+
+  useEffect(() => {
+    scrollToBottom(); // Scroll on initial load
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [conversation]);
+
   const lastMessage = conversation[conversation.length - 1];
   const isLastMessageChoice = lastMessage && lastMessage.type === "choice";
 
@@ -125,6 +139,7 @@ function Chatbot({
               conversation.map((message, index) => (
                 <div
                   key={index}
+                  ref={lastMessageRef}
                   className="flex w-full gap-3 text-slate-600 text-sm my-2"
                 >
                   <Avatar>
