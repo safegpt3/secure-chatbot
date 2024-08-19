@@ -123,6 +123,38 @@ exports.handler = async (event) => {
     const anonymizationSetting = userSettings.anonymizationSetting.BOOL;
     const memorySetting = userSettings.memorySetting.BOOL;
 
+    // Optionally save the message to DynamoDB based on memorySetting
+    if (memorySetting) {
+      console.log("Saving message to DynamoDB");
+      const updateParams = {
+        TableName,
+        Key: {
+          PK: { S: `userID#${userId}` },
+          SK: { S: `conversationID#${conversationId}` },
+        },
+        UpdateExpression:
+          "SET messages = list_append(if_not_exists(messages, :empty_list), :msg)",
+        ExpressionAttributeValues: {
+          ":empty_list": { L: [] },
+          ":msg": {
+            L: [
+              {
+                M: {
+                  messageId: { S: `msg-${new Date().getTime()}` },
+                  type: { S: "bot" },
+                  text: { S: responseText },
+                  timestamp: { S: new Date().toISOString() },
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
+      console.log("Message saved to DynamoDB");
+    }
+
     if (messageType === "text" && anonymizationSetting) {
       console.log(
         "Sending request to de-anonymize endpoint:",
@@ -189,38 +221,6 @@ exports.handler = async (event) => {
     const command = new PostToConnectionCommand(postParams);
     await apiGatewayClient.send(command);
     console.log("Message successfully forwarded to WebSocket");
-
-    // Optionally save the message to DynamoDB based on memorySetting
-    if (memorySetting) {
-      console.log("Saving message to DynamoDB");
-      const updateParams = {
-        TableName,
-        Key: {
-          PK: { S: `userID#${userId}` },
-          SK: { S: `conversationID#${conversationId}` },
-        },
-        UpdateExpression:
-          "SET messages = list_append(if_not_exists(messages, :empty_list), :msg)",
-        ExpressionAttributeValues: {
-          ":empty_list": { L: [] },
-          ":msg": {
-            L: [
-              {
-                M: {
-                  messageId: { S: `msg-${new Date().getTime()}` },
-                  type: { S: "bot" },
-                  text: { S: dataToSend.text },
-                  timestamp: { S: new Date().toISOString() },
-                },
-              },
-            ],
-          },
-        },
-      };
-
-      await dynamoDbClient.send(new UpdateItemCommand(updateParams));
-      console.log("Message saved to DynamoDB");
-    }
 
     return {
       statusCode: 200,
