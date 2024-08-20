@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/Toggle";
 import Spinner from "@/components/chatbot/Spinner";
 
 function DebugPannel({
@@ -29,6 +29,7 @@ function DebugPannel({
     } catch (error) {
       console.error("Error updating settings:", error);
     }
+    console.log("Data visibility updated:", isDataVisible);
     setIsSending(false);
   };
 
@@ -64,21 +65,23 @@ function DebugPannel({
       <p className="text-gray-700">
         <span className="font-medium">Timed Out:</span> {isTimedOut.toString()}
       </p>
-      <Button
+      <Toggle
         className="m-2 t-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
         onClick={toggleDataVisibility}
         disabled={isSending}
+        toggled={isDataVisible}
       >
         {isSending ? <Spinner /> : "Data Visibility Toggle"}
-      </Button>
+      </Toggle>
 
-      <Button
+      <Toggle
         className="m-2 mt-8 bg-gray-800 text-white font-semibold py-2 px-4 rounded hover:bg-gray-600"
         onClick={toggleChatbotMemory}
         disabled={isSending}
+        toggled={isChatbotMemory}
       >
         {isSending ? <Spinner /> : "Chatbot Memory Toggle"}
-      </Button>
+      </Toggle>
     </div>
   );
 }
