@@ -3,9 +3,6 @@ Transform: "AWS::Serverless-2016-10-31"
 Description: Secure Chatbot Backend.
 
 Parameters:
-  DummyParameter:
-    Type: String
-    Default: "v1"  # Increment this to force redeployment
   Environment:
     Type: String
     AllowedValues:
@@ -21,6 +18,9 @@ Parameters:
   BotpressEndpoint:
     Type: String
     Description: "BotpressEndpoint environment variable"
+  DummyParameter:
+    Type: String
+    Default: "v01"  # Increment this to force redeployment
 
 Globals:
   Function:
