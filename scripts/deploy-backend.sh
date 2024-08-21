@@ -53,6 +53,24 @@ sam deploy \
     ParameterKey=BotpressToken,ParameterValue=$BOTPRESS_TOKEN \
     ParameterKey=BotpressEndpoint,ParameterValue=$BOTPRESS_ENDPOINT
 
+# Capture the exit code of the SAM deployment
+DEPLOY_EXIT_CODE=$?
+
+if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
+    echo "Deployment succeeded."
+elif [ $DEPLOY_EXIT_CODE -eq 1 ]; then
+    if grep -q "No changes to deploy" /home/runner/work/secure-chatbot/secure-chatbot/packaged.yaml; then
+        echo "No changes detected. Exiting gracefully."
+        exit 0
+    else
+        echo "Deployment failed with unexpected errors."
+        exit 1
+    fi
+else
+    echo "Deployment failed with exit code $DEPLOY_EXIT_CODE."
+    exit $DEPLOY_EXIT_CODE
+fi
+
 # Output the stack outputs
 aws cloudformation describe-stacks \
   --stack-name $STACK_NAME \
