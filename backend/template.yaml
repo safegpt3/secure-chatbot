@@ -1,9 +1,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: "AWS::Serverless-2016-10-31"
 Description: Secure Chatbot Backend.
-# Added a new comment to force redeployment: increment this number if need be: 1
 
 Parameters:
+  DummyParameter:
+    Type: String
+    Default: "v1"  # Increment this to force redeployment
   Environment:
     Type: String
     AllowedValues:
