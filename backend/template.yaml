@@ -18,9 +18,6 @@ Parameters:
   BotpressEndpoint:
     Type: String
     Description: "BotpressEndpoint environment variable"
-  DummyParameter:
-    Type: String
-    Default: "v01"  # Increment this to force redeployment
 
 Globals:
   Function:
