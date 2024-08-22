@@ -41,6 +41,29 @@ sam package \
   --s3-bucket secure-chatbot-backend-artifacts-bucket \
   --region $AWS_REGION
 
+# Create a changeset without executing it
+echo "Creating a changeset to check for changes..."
+changeset_id=$(sam deploy \
+  --template-file packaged.yaml \
+  --stack-name $STACK_NAME \
+  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+  --region $AWS_REGION \
+  --parameter-overrides \
+    ParameterKey=Environment,ParameterValue=$ENVIRONMENT \
+    ParameterKey=OpenaiApiKey,ParameterValue=$OPENAI_API_KEY \
+    ParameterKey=BotpressToken,ParameterValue=$BOTPRESS_TOKEN \
+    ParameterKey=BotpressEndpoint,ParameterValue=$BOTPRESS_ENDPOINT \
+  --no-execute-changeset \
+  --query "Id" \
+  --output text)
+
+if [[ -z "$changeset_id" ]]; then
+  echo "No changes detected. Skipping deployment."
+  exit 0
+else
+  echo "Changes detected. Proceeding with deployment."
+fi
+
 # Deploy the SAM application
 sam deploy \
   --template-file packaged.yaml \
