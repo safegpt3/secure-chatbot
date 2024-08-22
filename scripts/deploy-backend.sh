@@ -51,7 +51,8 @@ sam deploy \
     ParameterKey=Environment,ParameterValue=$ENVIRONMENT \
     ParameterKey=OpenaiApiKey,ParameterValue=$OPENAI_API_KEY \
     ParameterKey=BotpressToken,ParameterValue=$BOTPRESS_TOKEN \
-    ParameterKey=BotpressEndpoint,ParameterValue=$BOTPRESS_ENDPOINT
+    ParameterKey=BotpressEndpoint,ParameterValue=$BOTPRESS_ENDPOINT \
+  --no-fail-on-empty-changeset
 
 # Output the stack outputs
 aws cloudformation describe-stacks \
