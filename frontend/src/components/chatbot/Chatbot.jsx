@@ -79,7 +79,8 @@ function Chatbot({
 
     try {
       const { data: { text } } = await Tesseract.recognize(file, 'eng');
-      setInput(text);
+      const formattedText = text.replace(/\n/g, ' \n');
+      setInput(formattedText);
     } catch (error) {
       console.error("Error performing OCR on image:", error);
     }
