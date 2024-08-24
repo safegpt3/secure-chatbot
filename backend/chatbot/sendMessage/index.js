@@ -9,6 +9,7 @@ const {
 const ANONYMIZE_ENDPOINT = process.env.ANONYMIZE_ENDPOINT;
 const BOTPRESS_ENDPOINT = process.env.BOTPRESS_ENDPOINT;
 const BOTPRESS_TOKEN = process.env.BOTPRESS_TOKEN;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const TableName = process.env.TABLE_NAME;
 
 const dynamoDbClient = new DynamoDBClient();
@@ -77,8 +78,7 @@ exports.handler = async (event) => {
 
     // Construct message to send
     if (memorySetting) {
-      previousConversationsText = "Previous conversations:\n";
-
+      // Fetch the 5 most recent conversations from DynamoDB
       const queryParams = {
         TableName,
         KeyConditionExpression:
@@ -87,34 +87,103 @@ exports.handler = async (event) => {
           ":userId": { S: `userID#${userId}` },
           ":conversationIdPrefix": { S: "conversationID#" },
         },
+        Limit: 5,
+        ScanIndexForward: false, // Fetch the most recent conversations
       };
 
       const queryResult = await dynamoDbClient.send(
         new QueryCommand(queryParams)
       );
 
-      console.log("queryResult.Items: ", queryResult.Items);
+      const recentConversations = queryResult.Items || [];
 
-      const previousConversations = queryResult.Items || [];
+      // Extract conversation text
+      const conversationSummaries = recentConversations
+        .map((item) => {
+          if (item.messages && item.messages.L) {
+            const conversationMessages = item.messages.L.map((message) => {
+              const sender = message.M.type.S === "user" ? "User" : "Bot";
+              return `${sender}: ${message.M.text.S}`;
+            }).join("\n");
+            return conversationMessages;
+          }
+          return "";
+        })
+        .join("\n---\n");
 
-      previousConversations.forEach((item, index) => {
-        if (
-          item.SK.S !== `conversationID#${conversationId}` &&
-          item.messages &&
-          item.messages.L
-        ) {
-          previousConversationsText += `Conversation ${index}:\n`;
+      // Send the recent conversations to GPT-4o for summarization
+      const apiEndpoint = "https://api.openai.com/v1/chat/completions";
 
-          const conversationMessages = item.messages.L.map((message) => {
-            const sender = message.M.type.S === "user" ? "User" : "Bot";
-            return `${sender}: ${message.M.text.S}`;
-          }).join("\n");
-          previousConversationsText += conversationMessages + "\n---\n";
+      const gptPayload = {
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an AI assistant summarizing previous patient conversations to extract information useful for a doctor.",
+          },
+          {
+            role: "user",
+            content: `Summarize the following conversations and extract relevant medical information that may be useful for a doctor:\n\n${conversationSummaries}`,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 512,
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0,
+      };
+
+      console.log(
+        "Generated payload for GPT-4:",
+        JSON.stringify(gptPayload, null, 2)
+      );
+
+      const headers = {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      };
+
+      try {
+        const gptResponse = await axios.post(apiEndpoint, gptPayload, {
+          headers,
+        });
+
+        console.log("OpenAI API response status:", gptResponse.status);
+        console.log(
+          "OpenAI API response data:",
+          JSON.stringify(gptResponse.data, null, 2)
+        );
+
+        if (gptResponse.status === 200) {
+          let summarizedInfo =
+            gptResponse.data.choices[0].message.content.trim();
+
+          // Strip out Markdown delimiters if present
+          if (
+            summarizedInfo.startsWith("```json") &&
+            summarizedInfo.endsWith("```")
+          ) {
+            summarizedInfo = summarizedInfo.slice(7, -3).trim();
+          }
+
+          console.log("Summarized info from GPT-4:", summarizedInfo);
+
+          formattedMessage += `Summary of previous conversations: ${summarizedInfo}\n---\nCurrent message: User: ${currentMessage}`;
+        } else {
+          console.error(
+            "Failed to get a successful response from OpenAI API:",
+            gptResponse.status,
+            gptResponse.statusText
+          );
         }
-      });
-
-      formattedMessage +=
-        previousConversationsText + `Current message: User: ${currentMessage}`;
+      } catch (error) {
+        console.error("Error processing message with OpenAI:", error);
+        return {
+          statusCode: 500,
+          body: JSON.stringify({ error: error.message }),
+        };
+      }
     } else {
       formattedMessage += `Current message: User: ${currentMessage}`;
     }
