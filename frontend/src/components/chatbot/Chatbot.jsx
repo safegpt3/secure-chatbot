@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
+import Tesseract from "tesseract.js";
 
 import userAvatar from "@/assets/user_profile_icon.png";
 import assistantAvatar from "@/assets/bot_profile_icon.png";
@@ -37,10 +38,15 @@ function Chatbot({
   setIsChatbotOpen,
 }) {
   const [input, setInput] = useState("");
+  const [file, setFile] = useState(null);
   const lastMessageRef = useRef();
 
   const handleInputChange = (event) => {
     setInput(event.target.value);
+  };
+
+  const handleFileChange = (event) => {
+    setFile(event.target.files[0]);
   };
 
   const handleTextSubmit = (event) => {
@@ -63,6 +69,23 @@ function Chatbot({
       handleNewMessage(newMessage);
       setInput("");
     }
+  };
+
+  const handleFileSubmit = async (event) => {
+    event.preventDefault();
+    if (!file) return;
+
+    console.log("File submitted:", file);
+
+    try {
+      const { data: { text } } = await Tesseract.recognize(file, 'eng');
+      const formattedText = text.replace(/\n/g, ' \n');
+      setInput(formattedText);
+    } catch (error) {
+      console.error("Error performing OCR on image:", error);
+    }
+
+    setFile(null);
   };
 
   const handleChoiceSubmit = (choice) => {
@@ -197,6 +220,12 @@ function Chatbot({
                 />
                 <Button type="submit" disabled={!isConnected || isSending}>
                   {isSending ? <Spinner /> : "Send"}
+                </Button>
+              </form>
+              <form className="w-full flex gap-2 mt-2" onSubmit={handleFileSubmit}>
+                <input type="file" onChange={handleFileChange} />
+                <Button type="submit" disabled={!isConnected || isSending}>
+                  {isSending ? <Spinner /> : "Upload"}
                 </Button>
               </form>
             </div>
