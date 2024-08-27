@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import Tesseract from "tesseract.js";
+import scribe from 'scribe.js-ocr/scribe.js';
 
 import userAvatar from "@/assets/user_profile_icon.png";
 import assistantAvatar from "@/assets/bot_profile_icon.png";
@@ -78,7 +79,10 @@ function Chatbot({
     console.log("File submitted:", file);
 
     try {
-      const { data: { text } } = await Tesseract.recognize(file, 'eng');
+      await scribe.init({ ocr: true, font: true });
+      const text = await scribe.extractText([file]);
+      console.log("Extracted text from image or pdf:", text);
+      // const { data: { text } } = await Tesseract.recognize(file, 'eng');
       const formattedText = text.replace(/\n/g, ' \n');
       setInput(formattedText);
     } catch (error) {
