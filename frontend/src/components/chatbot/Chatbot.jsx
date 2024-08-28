@@ -40,7 +40,46 @@ function Chatbot({
 }) {
   const [input, setInput] = useState("");
   const [file, setFile] = useState(null);
+  const [isListening, setIsListening] = useState(false);
   const lastMessageRef = useRef();
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    if (!('webkitSpeechRecognition' in window)) {
+      console.error("Speech recognition not supported in this browser.");
+      return;
+    }
+
+    const recognition = new window.webkitSpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      setInput(finalTranscript || interimTranscript);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error", event);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+  }, []);
 
   const handleInputChange = (event) => {
     setInput(event.target.value);
@@ -138,6 +177,15 @@ function Chatbot({
   const lastMessage = conversation[conversation.length - 1];
   const isLastMessageChoice = lastMessage && lastMessage.type === "choice";
 
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+    }
+    setIsListening(!isListening);
+  };
+
   return (
     <>
       <Card className="fixed bottom-8 right-4 w-[440px] h-[80vh] z-50 flex flex-col">
@@ -224,6 +272,9 @@ function Chatbot({
                 />
                 <Button type="submit" disabled={!isConnected || isSending}>
                   {isSending ? <Spinner /> : "Send"}
+                </Button>
+                <Button type="button" onClick={toggleListening}>
+                  {isListening ? "Stop" : "Speak"}
                 </Button>
               </form>
               <form className="w-full flex gap-2 mt-2" onSubmit={handleFileSubmit}>
