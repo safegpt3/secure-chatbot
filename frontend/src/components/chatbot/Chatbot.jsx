@@ -1,7 +1,7 @@
+// Chatbot.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import Tesseract from "tesseract.js";
-import scribe from 'scribe.js-ocr/scribe.js';
+import scribe from "scribe.js-ocr/scribe.js";
 
 import userAvatar from "@/assets/user_profile_icon.png";
 import assistantAvatar from "@/assets/bot_profile_icon.png";
@@ -23,7 +23,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import CloseChatbotButton from "@/components/chatbot/CloseChatbotButton";
 import RefreshChatbotButton from "@/components/chatbot/RefreshChatbotButton";
 import ChoiceOptions from "@/components/chatbot/ChoiceOptions";
-import Spinner from "./Spinner";
+import Spinner from "@/components/chatbot/Spinner";
+import { processVideoFile } from "@/components/chatbot/VideoProcessor";
 
 function Chatbot({
   userId,
@@ -40,12 +41,13 @@ function Chatbot({
 }) {
   const [input, setInput] = useState("");
   const [file, setFile] = useState(null);
+  const [processedText, setProcessedText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const lastMessageRef = useRef();
   const recognitionRef = useRef(null);
 
   useEffect(() => {
-    if (!('webkitSpeechRecognition' in window)) {
+    if (!("webkitSpeechRecognition" in window)) {
       console.error("Speech recognition not supported in this browser.");
       return;
     }
@@ -53,11 +55,11 @@ function Chatbot({
     const recognition = new window.webkitSpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = "en-US";
 
     recognition.onresult = (event) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
+      let interimTranscript = "";
+      let finalTranscript = "";
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
@@ -118,17 +120,45 @@ function Chatbot({
     console.log("File submitted:", file);
 
     try {
-      await scribe.init({ ocr: true, font: true });
-      const text = await scribe.extractText([file]);
-      console.log("Extracted text from image or pdf:", text);
-      // const { data: { text } } = await Tesseract.recognize(file, 'eng');
-      const formattedText = text.replace(/\n/g, ' \n');
-      setInput(formattedText);
+      const fileType = file.type;
+      if (fileType === "video/mp4") {
+        // Process video file
+        const text = await processVideoFile(file);
+        console.log("Extracted text from video frames:", text);
+        const formattedText = text.replace(/\n/g, " \n");
+        setProcessedText(formattedText);
+      } else {
+        // Process image or PDF file
+        await scribe.init({ ocr: true, font: true });
+        const text = await scribe.extractText([file]);
+        console.log("Extracted text from image or pdf:", text);
+        const formattedText = text.replace(/\n/g, " \n");
+        setProcessedText(formattedText);
+      }
     } catch (error) {
-      console.error("Error performing OCR on image:", error);
+      console.error("Error performing OCR on file:", error);
     }
 
     setFile(null);
+  };
+
+  const handleSendProcessedText = () => {
+    const newMessage = {
+      action: "send",
+      userId,
+      conversationId,
+      messageId: uuidv4(),
+      type: "text",
+      text: processedText.trim(),
+      role: "user",
+      internalType: "text",
+    };
+
+    if (processedText.trim()) {
+      sendMessage(newMessage);
+      handleNewMessage(newMessage);
+      setProcessedText("");
+    }
   };
 
   const handleChoiceSubmit = (choice) => {
@@ -188,7 +218,7 @@ function Chatbot({
 
   return (
     <>
-      <Card className="fixed bottom-8 right-4 w-[440px] h-[80vh] z-50 flex flex-col">
+      <Card className="fixed bottom-8 right-4 w-[800px] h-[80vh] z-50 flex flex-col">
         <CardHeader className="flex justify-between items-center border-b-2 border-black">
           <div className="w-full flex items-center justify-between">
             <div className="flex items-center">
@@ -207,85 +237,114 @@ function Chatbot({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 overflow-hidden">
-          <ScrollArea className="flex flex-col h-full w-full pr-4 overflow-auto">
-            {conversation &&
-              conversation.map &&
-              conversation.map((message, index) => (
-                <div
-                  key={index}
-                  ref={lastMessageRef}
-                  className="flex w-full gap-3 text-slate-600 text-sm my-2"
-                >
+        <CardContent className="flex-1 overflow-hidden flex">
+          {/* Main Chat Area */}
+          <div className="flex-1">
+            <ScrollArea className="flex flex-col h-full w-full pr-4 overflow-auto">
+              {conversation &&
+                conversation.map &&
+                conversation.map((message, index) => (
+                  <div
+                    key={index}
+                    ref={lastMessageRef}
+                    className="flex w-full gap-3 text-slate-600 text-sm my-2"
+                  >
+                    <Avatar>
+                      <AvatarFallback>
+                        {message.role === "user" ? "U" : "Bot"}
+                      </AvatarFallback>
+                      <AvatarImage
+                        src={
+                          message.role === "user"
+                            ? userAvatar
+                            : assistantAvatar
+                        }
+                      />
+                    </Avatar>
+                    <p className="leading-relaxed ">
+                      <span className="block font-bold text-slate-700">
+                        {message.role === "user" ? "User" : "Bot"}
+                      </span>
+                      {message.text}
+                    </p>
+                  </div>
+                ))}
+              {isSending && (
+                <div className="flex w-full gap-3 text-slate-600 text-sm my-2">
                   <Avatar>
-                    <AvatarFallback>
-                      {message.role === "user" ? "U" : "Bot"}
-                    </AvatarFallback>
-                    <AvatarImage
-                      src={
-                        message.role === "user" ? userAvatar : assistantAvatar
-                      }
-                    />
+                    <AvatarFallback>Bot</AvatarFallback>
+                    <AvatarImage src={assistantAvatar} />
                   </Avatar>
-                  <p className="leading-relaxed ">
-                    <span className="block font-bold text-slate-700">
-                      {message.role === "user" ? "User" : "Bot"}
+                  <p className="leading-relaxed">
+                    <span className="block font-bold text-slate-700">Bot</span>
+                    <span className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
                     </span>
-                    {message.text}
                   </p>
                 </div>
-              ))}
-            {isSending && (
-              <div className="flex w-full gap-3 text-slate-600 text-sm my-2">
-                <Avatar>
-                  <AvatarFallback>Bot</AvatarFallback>
-                  <AvatarImage src={assistantAvatar} />
-                </Avatar>
-                <p className="leading-relaxed">
-                  <span className="block font-bold text-slate-700">Bot</span>
-                  <span className="typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                </p>
-              </div>
-            )}
-          </ScrollArea>
-        </CardContent>
-        <CardFooter className="flex-none">
-          {isLastMessageChoice ? (
-            <ScrollArea className="h-full w-full max-h-[150px] overflow-auto">
-              <ChoiceOptions
-                options={lastMessage.options}
-                onChoiceSelect={handleChoiceSubmit}
-              />
+              )}
             </ScrollArea>
-          ) : (
-            <div className="w-full">
-              <form className="w-full flex gap-2" onSubmit={handleTextSubmit}>
-                <Input
-                  placeholder="Type your message..."
-                  value={input}
-                  onChange={handleInputChange}
-                  disabled={!isConnected || isSending}
-                />
-                <Button type="submit" disabled={!isConnected || isSending}>
-                  {isSending ? <Spinner /> : "Send"}
-                </Button>
-                <Button type="button" onClick={toggleListening}>
-                  {isListening ? "Stop" : "Speak"}
-                </Button>
-              </form>
-              <form className="w-full flex gap-2 mt-2" onSubmit={handleFileSubmit}>
-                <input type="file" onChange={handleFileChange} />
-                <Button type="submit" disabled={!isConnected || isSending}>
-                  {isSending ? <Spinner /> : "Upload"}
-                </Button>
-              </form>
+            <CardFooter className="flex-none">
+              {isLastMessageChoice ? (
+                <ScrollArea className="h-full w-full max-h-[150px] overflow-auto">
+                  <ChoiceOptions
+                    options={lastMessage.options}
+                    onChoiceSelect={handleChoiceSubmit}
+                  />
+                </ScrollArea>
+              ) : (
+                <div className="w-full">
+                  <form
+                    className="w-full flex gap-2"
+                    onSubmit={handleTextSubmit}
+                  >
+                    <Input
+                      placeholder="Type your message..."
+                      value={input}
+                      onChange={handleInputChange}
+                      disabled={!isConnected || isSending}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={!isConnected || isSending}
+                    >
+                      {isSending ? <Spinner /> : "Send"}
+                    </Button>
+                    <Button type="button" onClick={toggleListening}>
+                      {isListening ? "Stop" : "Speak"}
+                    </Button>
+                  </form>
+                  <form
+                    className="w-full flex gap-2 mt-2"
+                    onSubmit={handleFileSubmit}
+                  >
+                    <input type="file" onChange={handleFileChange} />
+                    <Button
+                      type="submit"
+                      disabled={!isConnected || isSending}
+                    >
+                      {isSending ? <Spinner /> : "Upload"}
+                    </Button>
+                  </form>
+                </div>
+              )}
+            </CardFooter>
+          </div>
+          {/* Side Panel for Processed Text */}
+          {processedText && (
+            <div className="w-1/3 border-l border-gray-200 p-4">
+              <h3 className="text-lg font-bold mb-2">Processed Text</h3>
+              <ScrollArea className="h-full w-full overflow-auto">
+                <p className="text-sm whitespace-pre-wrap">{processedText}</p>
+              </ScrollArea>
+              <Button className="mt-2" onClick={handleSendProcessedText}>
+                Send to Chat
+              </Button>
             </div>
           )}
-        </CardFooter>
+        </CardContent>
       </Card>
       {isTimedOut && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">

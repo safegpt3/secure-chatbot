@@ -3,7 +3,8 @@ import { jwtDecode } from "jwt-decode";
 
 const useAuth = (setUserId) => {
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get("token");
+    // const token = new URLSearchParams(window.location.search).get("token");
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEyMzRhYmNkIiwidXNlcm5hbWUiOiJ1c2VyIiwiaWF0IjoxNzIyMDI3NTE4LCJleHAiOjE3MjIwMzExMTh9.heIiDB2MbUsJrPK5wCAskWPNyQ0R_gFRsx6Pnlogmmk";
     if (token) {
       authenticateUser(token);
     } else {
