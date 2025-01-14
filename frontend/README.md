@@ -131,3 +131,6 @@ To run locally add the following to line 6 in the useAuth.js
 ```
 const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEyMzRhYmNkIiwidXNlcm5hbWUiOiJ1c2VyIiwiaWF0IjoxNzIyMDI3NTE4LCJleHAiOjE3MjIwMzExMTh9.heIiDB2MbUsJrPK5wCAskWPNyQ0R_gFRsx6Pnlogmmk";
 ```
+
+## EXTRA NOTE FOR ME
+The debugging panel or the normal panel should have like a french/English button to set everything into french and/or english
