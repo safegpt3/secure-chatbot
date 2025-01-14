@@ -134,3 +134,4 @@ const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEyMzRhYmNkIiwidXNl
 
 ## EXTRA NOTE FOR ME
 The debugging panel or the normal panel should have like a french/English button to set everything into french and/or english
+this is just to trigger the workflow
